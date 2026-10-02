@@ -197,3 +197,22 @@ Date: 2026-10-02. Dev server `http://127.0.0.1:3011`, API `http://127.0.0.1:8765
 | Q20 Controls | PASS | Talk opened the panel. Escape closed it and Enter on Talk opened it again. Country, gender, and tone changed the named voice. A feminine United States choice named Paul as the closest voice. Jane was the United Kingdom feminine voice at a bright tone, with the style curious. A masculine France choice named Marie as the closest voice. The guide states the Talk limit. Settings showed that the assistant needs the server key. Delete this account returned to Sign in. |
 | Q09 Loading | BLOCKED | The missing-key state is immediate. A slowed model reply was not exercised because the key is not set. |
 | Q17 JavaScript | BLOCKED | Not remeasured. |
+
+## Follow-up: Vercel preview
+
+Date: 2026-10-03. This does not replace the tables above and does not call the gate a release pass. Decision remains **REVISE**.
+
+The desk and the API deploy as one Vercel project, `retrace-os`, using services in `vercel.json`. The preview is `https://retrace-9e3ycpr5m-frank-asante-van-laarhovens-projects.vercel.app`. It is a `vercel.app` preview. It was not promoted with `--prod`. Deployment protection is on, so a normal browser is asked to sign in to Vercel before the page opens. `vercel curl` was used to pass that protection. No database URL and no OpenRouter key were set. GitHub `main` is still `00cec99`, so a Git deployment of that commit does not contain this configuration.
+
+| ID | Result | Evidence |
+|---|---|---|
+| Q01 Production domain | N/A | No approved branded origin. The host above is a preview. A second project, `retrace-os-b227`, was left unused after its FastAPI-only build failed. |
+| Q02 Page titles | PASS for this probe | `GET /login` title was `Sign in · RETRACE`. |
+| Q08 Custom 404 | PASS for this probe | `GET /not-a-page` returned 404 and the body contained "That page is not on this desk." The document title fell back to `Desk`. |
+| Q10 Errors | PASS for this flow | `POST /api/assistant` returned 503 `needs_configuration` and said the OpenRouter key is not set. Nothing was sent. The untouched ecology notebook returned `FAILED` / `FAILED_EXECUTION`, the same outcome as the local baseline. |
+| Q14 Console | PASS for the local guide | Chrome on `http://127.0.0.1:3011` recorded no app-owned console errors while reading the new Vercel sentence, then deleting the temporary display name `Vercel Check`. |
+| Q16 Source maps | PASS for the local check build | `RETRACE_NEXT_DIST=.next-check pnpm build` produced 0 `.map` files under `.next-check/static`. `productionBrowserSourceMaps` stays false. |
+| Q18 Mobile layout | PASS for the guide sentence | Document overflow was 0 at 1440×900, 768×1024, and 390×844 on `/guide`. Screenshots: `docs/quality/vercel-guide-desktop.png`, `docs/quality/vercel-guide-mobile.png`. |
+| Q20 Controls | PASS for this probe | Sign-in on the preview set `retrace_session` as HttpOnly, SameSite=lax, and Secure. Delete account returned 204. Talk stayed on the desk. `/api/health` returned the RETRACE version. Capabilities said records last only until the instance stops, and row-level security is not claimed. |
+| Q09 Loading | BLOCKED | A slowed response was not exercised. |
+| Q17 JavaScript | BLOCKED | The check build's static JavaScript totalled 1,313,538 bytes. That was not compared with a recorded budget. |

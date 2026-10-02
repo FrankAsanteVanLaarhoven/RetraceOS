@@ -41,13 +41,69 @@ _SIGN_IN_LIMIT = 40
 _CHANGE_LIMIT = 500
 
 
+def _https_origin(name: str) -> str | None:
+    host = os.environ.get(name, "").strip().rstrip("/")
+    if not host:
+        return None
+    if host.startswith("https://") or host.startswith("http://"):
+        return host
+    return f"https://{host}"
+
+
 def allowed_origins() -> set[str]:
     extra = {item.strip().rstrip("/") for item in os.environ.get("RETRACE_ORIGINS", "").split(",") if item.strip()}
-    return set(_LOCAL_ORIGINS) | extra
+    hosted = {
+        origin
+        for origin in (
+            _https_origin("VERCEL_URL"),
+            _https_origin("VERCEL_BRANCH_URL"),
+            _https_origin("VERCEL_PROJECT_PRODUCTION_URL"),
+        )
+        if origin
+    }
+    return set(_LOCAL_ORIGINS) | extra | hosted
 
 
 def cookie_secure() -> bool:
-    return os.environ.get("RETRACE_COOKIE_SECURE", "").strip() == "1"
+    flag = os.environ.get("RETRACE_COOKIE_SECURE", "").strip()
+    if flag == "1":
+        return True
+    if flag == "0":
+        return False
+    return os.environ.get("VERCEL", "").strip() == "1"
+
+
+def database_url() -> str | None:
+    raw = os.environ.get("RETRACE_DATABASE_URL", "").strip() or os.environ.get("POSTGRES_URL", "").strip()
+    return raw or None
+
+
+def database_mode() -> str:
+    if database_url():
+        return "operator"
+    if os.environ.get("VERCEL", "").strip() == "1":
+        return "ephemeral"
+    return "sqlite"
+
+
+def database_description() -> str:
+    if database_mode() == "operator":
+        return "The operator's database URL holds the records. PostgreSQL row-level security is not claimed."
+    if database_mode() == "ephemeral":
+        return (
+            "This host has no durable database URL. Accounts and projects last only until the instance stops. "
+            "PostgreSQL row-level security is not claimed."
+        )
+    return (
+        "SQLite with application-enforced account separation. "
+        "PostgreSQL row-level security is not claimed: no PostgreSQL server is configured."
+    )
+
+
+def data_root() -> Path:
+    if os.environ.get("VERCEL", "").strip() == "1" and not os.environ.get("RETRACE_DATA"):
+        return Path("/tmp/retrace")
+    return Path(os.environ.get("RETRACE_DATA", "data"))
 
 
 def client_key(request: Request) -> str:
@@ -95,7 +151,8 @@ def capabilities() -> dict:
         "profile": "public-scientist",
         "release_decision": "REVISE",
         "sandbox": "Curated demonstration notebooks only. No tested sandbox is configured, so other notebooks are refused.",
-        "database": "SQLite with application-enforced account separation. PostgreSQL row-level security is not claimed: no PostgreSQL server is configured.",
+        "database": database_description(),
+        "database_mode": database_mode(),
         "models": {
             "anthropic": model_state("ANTHROPIC_API_KEY"),
             "openrouter": model_state("OPENROUTER_API_KEY"),
@@ -106,8 +163,8 @@ def capabilities() -> dict:
     }
 
 
-def create_app(database: Path, objects: Path) -> FastAPI:
-    service = Service(Store(database, objects))
+def create_app(database: Path, objects: Path, database_url: str | None = None) -> FastAPI:
+    service = Service(Store(database, objects, database_url=database_url))
     app = FastAPI(title="RETRACE", version=__version__, docs_url=None, redoc_url=None)
     app.state.service = service
     app.state.engine = service.store.engine
@@ -512,9 +569,9 @@ def create_app(database: Path, objects: Path) -> FastAPI:
 
 
 def default_app() -> FastAPI:
-    root = Path(os.environ.get("RETRACE_DATA", "data"))
+    root = data_root()
     root.mkdir(parents=True, exist_ok=True)
-    return create_app(root / "retrace.sqlite", root / "objects")
+    return create_app(root / "retrace.sqlite", root / "objects", database_url())
 
 
 def main() -> None:

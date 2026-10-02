@@ -13,3 +13,7 @@ build/
 *.egg-info/
 .DS_Store
 *.tsbuildinfo
+.vercel/
+.next-check/
+.vercel
+.env*

@@ -761,3 +761,79 @@ def test_public_platform_keeps_each_scientist_record(client: TestClient, monkeyp
     assert blocked.status_code == 429
     assert blocked.json()["error"] == "rate_limited"
     assert "Wait a minute" in blocked.json()["next"]
+
+
+def test_sqlite_objects_stay_on_disk(tmp_path: Path) -> None:
+    store = Store(tmp_path / "retrace.sqlite", tmp_path / "objects")
+    digest = store.put_bytes(b"notebook-bytes")
+    assert (tmp_path / "objects" / digest).is_file()
+    assert store.read_bytes(digest) == b"notebook-bytes"
+    assert store.objects_in_database is False
+    store.drop_unreferenced(digest)
+    assert not (tmp_path / "objects" / digest).exists()
+
+
+def test_database_url_normalizer_does_not_connect() -> None:
+    from retrace.store import sqlalchemy_url
+
+    assert sqlalchemy_url("postgres://scientist:example@db.invalid/retrace") == "postgresql+psycopg://scientist:example@db.invalid/retrace"
+    assert sqlalchemy_url("postgresql://scientist:example@db.invalid/retrace") == "postgresql+psycopg://scientist:example@db.invalid/retrace"
+    assert sqlalchemy_url("postgresql+psycopg://scientist:example@db.invalid/retrace") == "postgresql+psycopg://scientist:example@db.invalid/retrace"
+    assert sqlalchemy_url("sqlite:///tmp/retrace.sqlite") == "sqlite:///tmp/retrace.sqlite"
+
+
+def test_vercel_preview_uses_https_cookie_and_ephemeral_records(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import retrace.api as api
+    from retrace.privacy import privacy_notice
+
+    monkeypatch.setenv("VERCEL", "1")
+    monkeypatch.setenv("VERCEL_URL", "retrace-preview.vercel.app")
+    monkeypatch.setenv("VERCEL_BRANCH_URL", "retrace-git-main.vercel.app")
+    monkeypatch.delenv("VERCEL_PROJECT_PRODUCTION_URL", raising=False)
+    monkeypatch.delenv("RETRACE_DATABASE_URL", raising=False)
+    monkeypatch.delenv("POSTGRES_URL", raising=False)
+    monkeypatch.delenv("RETRACE_COOKIE_SECURE", raising=False)
+    monkeypatch.delenv("RETRACE_DATA", raising=False)
+    assert api.data_root() == Path("/tmp/retrace")
+    assert api.cookie_secure() is True
+    assert "https://retrace-preview.vercel.app" in api.allowed_origins()
+    assert "https://retrace-git-main.vercel.app" in api.allowed_origins()
+    assert "until the instance stops" in api.database_description()
+    notice = privacy_notice()
+    assert "until the instance stops" in " ".join(notice["not_done"])
+    assert "not part of this build" in notice["assessment"]
+    assert "Notebook files and stored results are not sent" in " ".join(notice["not_done"])
+    monkeypatch.setenv("RETRACE_DATA", str(tmp_path))
+    app = api.default_app()
+    assert app.state.service.store.database == tmp_path / "retrace.sqlite"
+    with TestClient(app) as preview:
+        signed = preview.post(
+            "/api/session",
+            json={"display_name": "Preview Scientist"},
+            headers={"Origin": "https://retrace-preview.vercel.app"},
+        )
+        assert signed.status_code == 200, signed.text
+        assert "secure" in signed.headers["set-cookie"].lower()
+        capabilities = preview.get("/api/capabilities")
+        assert capabilities.json()["database_mode"] == "ephemeral"
+        assert capabilities.json()["release_decision"] == "REVISE"
+        assert "until the instance stops" in capabilities.json()["database"]
+    monkeypatch.setenv("RETRACE_COOKIE_SECURE", "0")
+    assert api.cookie_secure() is False
+
+
+def test_operator_database_url_is_not_row_level_security(monkeypatch: pytest.MonkeyPatch) -> None:
+    import retrace.api as api
+    from retrace.privacy import privacy_notice
+
+    monkeypatch.setenv("VERCEL", "1")
+    monkeypatch.setenv("RETRACE_DATABASE_URL", "postgres://scientist:example@db.invalid/retrace")
+    assert api.database_mode() == "operator"
+    text = api.database_description()
+    assert "database URL" in text
+    assert "row-level security is not claimed" in text
+    assert "db.invalid" not in text
+    notice = " ".join(privacy_notice()["not_done"])
+    assert "row-level security is not claimed" in notice
+    assert "db.invalid" not in notice
+    assert "not part of this build" in privacy_notice()["assessment"]

@@ -2,8 +2,22 @@
 
 from __future__ import annotations
 
+import os
+
 
 def privacy_notice() -> dict:
+    limits = [
+        "Records are not sold",
+        "Notebook files and stored results are not sent to a model provider",
+        "A conversation turn is sent to OpenRouter only when the scientist uses the assistant and the server key is set. The service does not store that conversation. The reply is not a reproduction result.",
+        "There is no password and no organisation sign-in in this build",
+    ]
+    if os.environ.get("VERCEL", "").strip() == "1":
+        durable = os.environ.get("RETRACE_DATABASE_URL", "").strip() or os.environ.get("POSTGRES_URL", "").strip()
+        if durable:
+            limits.append("The operator's database URL holds the records. PostgreSQL row-level security is not claimed.")
+        else:
+            limits.append("This host has no durable database URL. Accounts and projects last only until the instance stops.")
     return {
         "product": "RETRACE",
         "audience": "RETRACE is a public platform for scientists. Each display name is one scientist account.",
@@ -22,12 +36,7 @@ def privacy_notice() -> dict:
             "A SHA-256 hash of the tool key for this account",
             "A Slack token only when that scientist pastes one",
         ],
-        "not_done": [
-            "Records are not sold",
-            "Notebook files and stored results are not sent to a model provider",
-            "A conversation turn is sent to OpenRouter only when the scientist uses the assistant and the server key is set. The service does not store that conversation. The reply is not a reproduction result.",
-            "There is no password and no organisation sign-in in this build",
-        ],
+        "not_done": limits,
         "rights": {
             "export": "Settings downloads the record for the signed-in scientist. Session tokens and connector secrets are left out.",
             "erasure": "Settings can delete that account. Deletion removes the projects, sessions, and saved tokens from this service.",

@@ -31,19 +31,19 @@ export function Clock() {
     );
   }
 
-  function format(timeZone: string) {
+  function format(time: Date, timeZone: string) {
     const options: Intl.DateTimeFormatOptions = { hour: "2-digit", minute: "2-digit", timeZone, hourCycle: "h23" };
     try {
-      return new Intl.DateTimeFormat(prefs.locale, options).format(now);
+      return new Intl.DateTimeFormat(prefs.locale, options).format(time);
     } catch {
-      return new Intl.DateTimeFormat("en-GB", options).format(now);
+      return new Intl.DateTimeFormat("en-GB", options).format(time);
     }
   }
-  const utc = format("UTC");
+  const utc = format(now, "UTC");
   let local = utc;
   let localLabel = "UTC";
   try {
-    local = format(zone);
+    local = format(now, zone);
     localLabel = zone;
   } catch {
     localLabel = "UTC";

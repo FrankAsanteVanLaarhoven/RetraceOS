@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import secrets
 from datetime import datetime, timedelta, timezone
@@ -51,6 +52,13 @@ def _locale_tags() -> set[str]:
 
     raw = resources.files("retrace").joinpath("locales.json").read_text(encoding="utf-8")
     return {item["tag"] for item in json.loads(raw)}
+
+
+def _mcp_url() -> str:
+    host = (os.environ.get("VERCEL_PROJECT_PRODUCTION_URL") or os.environ.get("VERCEL_URL") or "").strip().rstrip("/")
+    if host:
+        return f"https://{host}/mcp"
+    return "http://127.0.0.1:8765/mcp"
 
 
 class Service:
@@ -116,7 +124,7 @@ class Service:
         payload = {
             "server": "RETRACE",
             "note": "Local tool connection for this desk account. It can read project names and questions. It cannot run a notebook.",
-            "url": "http://127.0.0.1:8765/mcp",
+            "url": _mcp_url(),
             "authorization": f"Bearer {token}",
         }
         try:
@@ -255,9 +263,7 @@ class Service:
             with self.store.session() as db:
                 still = set(db.scalars(select(SnapshotFile.sha256).where(SnapshotFile.sha256.in_(digests))).all())
             for digest in digests - still:
-                path = self.store.objects / digest
-                if path.is_file():
-                    path.unlink()
+                self.store.drop_unreferenced(digest)
         client_file = self.store.database.parent / "mcp" / f"{principal_id}.json"
         if client_file.is_file():
             client_file.unlink()

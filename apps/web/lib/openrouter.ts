@@ -1,4 +1,5 @@
 import { HEAR_MODEL, JOBS, SPEECH_MODEL, VOICES, type Job, type Turn, systemPrompt } from "@/lib/assistant";
+import { deskOrigin } from "@/lib/api-base";
 
 const HITS = new Map<string, number[]>();
 
@@ -55,7 +56,7 @@ async function postOpenRouter(path: string, body: unknown): Promise<Response> {
     headers: {
       Authorization: `Bearer ${key()}`,
       "Content-Type": "application/json",
-      "HTTP-Referer": "http://127.0.0.1:3011",
+      "HTTP-Referer": deskOrigin(),
       "X-Title": "RETRACE",
     },
     body: JSON.stringify(body),

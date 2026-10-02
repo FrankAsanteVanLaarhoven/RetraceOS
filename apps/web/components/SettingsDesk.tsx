@@ -12,7 +12,7 @@ export function SettingsDesk({
   capabilities,
 }: {
   name: string;
-  capabilities: { profile: string; sandbox: string; database: string; models: Record<string, string> };
+  capabilities: { profile: string; sandbox: string; database: string; database_mode?: string; models: Record<string, string> };
 }) {
   const { t } = useDesk();
   const router = useRouter();
@@ -39,7 +39,7 @@ export function SettingsDesk({
       <p className="eyebrow">{t("settings.profile")}</p>
       <h1>{t("settings.title")}</h1>
       <p className="lede">{t("settings.sandbox")}</p>
-      <p>{t("settings.database")}</p>
+      <p>{capabilities.database_mode && capabilities.database_mode !== "sqlite" ? capabilities.database : t("settings.database")}</p>
       <p>{t("settings.personal")}</p>
       <div className="panel">
         <PreferenceFields idPrefix="settings" />

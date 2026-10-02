@@ -46,6 +46,7 @@ export function GuideDesk() {
           <li>The desk stores its own calendar. It does not talk to Google Calendar.</li>
           <li>Repairs are not sent to a model. Talk calls OpenRouter when the desk server has a key. It does not send notebooks or stored results, and it cannot approve a contract or assign a reproduction result. A missing key leaves Talk unconfigured.</li>
           <li>The database is a local file on this workstation. It is not an institutional database with row-level security.</li>
+          <li>A Vercel deployment serves the same desk over HTTPS. Set OPENROUTER_API_KEY for Talk. Set RETRACE_DATABASE_URL to a PostgreSQL URL if accounts must remain after the host restarts. Row-level security is not claimed. A vercel.app address is a preview.</li>
           <li>English is the reviewed language. Other languages change the buttons and headings. They are drafts, and the screen says so. Project names, notebook text, and stored results stay in the language they were written in.</li>
         </ul>
       </section>

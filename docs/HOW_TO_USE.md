@@ -22,6 +22,7 @@ Use RETRACE when you want to recover an analysis and still be able to say what c
 - The desk stores its own calendar. It does not talk to Google Calendar.
 - Repairs are not sent to a model. Talk, on every page, calls OpenRouter when the desk server has OPENROUTER_API_KEY. The usual conversation uses Anthropic Claude Sonnet. Explaining a result uses Claude Opus. Drafting a record uses Claude Haiku. You can speak or type, and the reply can be spoken in a voice chosen by gender, tone, and country. The service does not store that conversation, and it does not send notebooks or stored results. Talk cannot approve a contract or assign a reproduction result. A missing key leaves Talk unconfigured.
 - The database is a local file on this workstation. It is not an institutional database with row-level security.
+- A Vercel deployment serves the same desk over HTTPS. Set OPENROUTER_API_KEY for Talk. Set RETRACE_DATABASE_URL to a PostgreSQL URL if accounts must remain after the host restarts. Row-level security is not claimed. A vercel.app address is a preview.
 - English is the reviewed language. Other languages change the buttons and headings. They are drafts, and the screen says so. Project names, notebook text, and stored results stay in the language they were written in.
 
 ## Sign in

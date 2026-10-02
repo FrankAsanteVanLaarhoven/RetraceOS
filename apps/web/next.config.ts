@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  distDir: process.env.RETRACE_NEXT_DIST || ".next",
   poweredByHeader: false,
   reactStrictMode: true,
   productionBrowserSourceMaps: false,

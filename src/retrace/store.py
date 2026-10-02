@@ -4,8 +4,9 @@ import secrets
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, create_engine, select
+from sqlalchemy import DateTime, ForeignKey, Integer, LargeBinary, String, Text, create_engine, select
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
+from sqlalchemy.pool import NullPool
 
 from retrace.hashing import sha256_bytes
 
@@ -203,6 +204,14 @@ class Preference(Base):
     locale: Mapped[str] = mapped_column(String(20), default="en")
 
 
+class ObjectBlob(Base):
+    """Notebook bytes kept in the database when the host has no durable disk."""
+
+    __tablename__ = "object_blobs"
+    digest: Mapped[str] = mapped_column(String(64), primary_key=True)
+    data: Mapped[bytes] = mapped_column(LargeBinary)
+
+
 class ConnectorSecret(Base):
     """A token the person saved for their own account. API responses never include secret."""
 
@@ -213,17 +222,26 @@ class ConnectorSecret(Base):
     label: Mapped[str] = mapped_column(String(120), default="")
 
 
+def sqlalchemy_url(url: str) -> str:
+    if url.startswith("postgres://"):
+        return "postgresql+psycopg://" + url[len("postgres://") :]
+    if url.startswith("postgresql://"):
+        return "postgresql+psycopg://" + url[len("postgresql://") :]
+    return url
+
+
 class Store:
-    def __init__(self, database: Path, objects: Path) -> None:
+    def __init__(self, database: Path, objects: Path, database_url: str | None = None) -> None:
         objects.mkdir(parents=True, exist_ok=True)
         self.database = database
         self.objects = objects
-        self.engine = create_engine(
-            f"sqlite:///{database}",
-            connect_args={"check_same_thread": False},
-        )
+        self.database_url = sqlalchemy_url(database_url) if database_url else f"sqlite:///{database}"
+        self.objects_in_database = not self.database_url.startswith("sqlite")
+        kwargs: dict = {"poolclass": NullPool} if self.objects_in_database else {"connect_args": {"check_same_thread": False}}
+        self.engine = create_engine(self.database_url, **kwargs)
         Base.metadata.create_all(self.engine)
-        self._ensure_preference_locale()
+        if self.engine.dialect.name == "sqlite":
+            self._ensure_preference_locale()
         self._sessions = sessionmaker(self.engine, expire_on_commit=False)
 
     def _ensure_preference_locale(self) -> None:
@@ -239,6 +257,12 @@ class Store:
 
     def put_bytes(self, data: bytes) -> str:
         digest = sha256_bytes(data)
+        if self.objects_in_database:
+            with self.session() as db:
+                if db.get(ObjectBlob, digest) is None:
+                    db.add(ObjectBlob(digest=digest, data=data))
+                    db.commit()
+            return digest
         path = self.objects / digest
         if not path.exists():
             temporary = path.with_suffix(".tmp")
@@ -247,7 +271,25 @@ class Store:
         return digest
 
     def read_bytes(self, digest: str) -> bytes:
+        if self.objects_in_database:
+            with self.session() as db:
+                row = db.get(ObjectBlob, digest)
+                if row is None:
+                    raise FileNotFoundError(digest)
+                return bytes(row.data)
         return (self.objects / digest).read_bytes()
+
+    def drop_unreferenced(self, digest: str) -> None:
+        if self.objects_in_database:
+            with self.session() as db:
+                row = db.get(ObjectBlob, digest)
+                if row is not None:
+                    db.delete(row)
+                    db.commit()
+            return
+        path = self.objects / digest
+        if path.is_file():
+            path.unlink()
 
     def new_id(self) -> str:
         return secrets.token_hex(16)

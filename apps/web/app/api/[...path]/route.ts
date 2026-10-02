@@ -1,15 +1,14 @@
 import { NextRequest } from "next/server";
-
-const API = process.env.RETRACE_API ?? "http://127.0.0.1:8765";
+import { apiBase, deskOrigin } from "@/lib/api-base";
 
 async function proxy(request: NextRequest, context: { params: Promise<{ path: string[] }> }) {
   const { path } = await context.params;
-  const target = new URL(`${API}/api/${path.join("/")}`);
+  const target = new URL(`${apiBase()}/api/${path.join("/")}`);
   target.search = request.nextUrl.search;
   const headers = new Headers();
   const cookie = request.headers.get("cookie");
   if (cookie) headers.set("cookie", cookie);
-  headers.set("origin", request.headers.get("origin") ?? "http://127.0.0.1:3011");
+  headers.set("origin", request.headers.get("origin") ?? deskOrigin());
   const contentType = request.headers.get("content-type");
   if (contentType) headers.set("content-type", contentType);
   const hasBody = request.method !== "GET" && request.method !== "HEAD";

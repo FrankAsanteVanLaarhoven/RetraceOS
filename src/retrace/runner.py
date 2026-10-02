@@ -36,7 +36,23 @@ def _child_env(workspace: Path) -> dict[str, str]:
     env["PYTHONNOUSERSITE"] = "1"
     env["PYTHONDONTWRITEBYTECODE"] = "1"
     env["MPLBACKEND"] = "Agg"
+    pythonpath = os.environ.get("PYTHONPATH", "")
+    if pythonpath and not any(hint in pythonpath for hint in _SECRET_HINTS):
+        env["PYTHONPATH"] = pythonpath
     return env
+
+
+def _kernel_spec(workspace: Path) -> None:
+    """The three practice notebooks ask for a kernel named retrace. Write it into this run."""
+    kernel = workspace / ".jupyter" / "kernels" / "retrace"
+    kernel.mkdir(parents=True, exist_ok=True)
+    spec = {
+        "argv": [sys.executable, "-m", "ipykernel_launcher", "-f", "{connection_file}"],
+        "display_name": "RETRACE",
+        "language": "python",
+    }
+    (kernel / "kernel.json").write_text(json.dumps(spec), encoding="utf-8")
+    (workspace / ".jupyter-runtime").mkdir(parents=True, exist_ok=True)
 
 
 def _read_results(workspace: Path) -> tuple[dict | None, bool]:
@@ -89,10 +105,19 @@ def execute_workspace(files: dict[str, bytes], notebook_path: str) -> Execution:
                 )
             destination.parent.mkdir(parents=True, exist_ok=True)
             destination.write_bytes(data)
+        _kernel_spec(workspace)
+        env = _child_env(workspace)
+        # The function interpreter finds retrace on its own path. The child does not inherit that path.
+        env["PYTHONPATH"] = os.pathsep.join(
+            path for path in sys.path if path and not any(hint in path for hint in _SECRET_HINTS)
+        )
+        env["JUPYTER_DATA_DIR"] = str(workspace / ".jupyter")
+        env["JUPYTER_RUNTIME_DIR"] = str(workspace / ".jupyter-runtime")
+        env["IPYTHONDIR"] = str(workspace / ".ipython")
         completed = subprocess.run(
             [sys.executable, "-m", "retrace.exec_notebook", str(workspace), notebook_path],
             cwd=workspace,
-            env=_child_env(workspace),
+            env=env,
             capture_output=True,
             text=True,
             timeout=45,

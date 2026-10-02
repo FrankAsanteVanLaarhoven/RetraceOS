@@ -12,7 +12,13 @@ export default async function SettingsPage() {
   if (desk.offline) return <Offline />;
   const capabilitiesResponse = await api("/api/capabilities");
   if (!capabilitiesResponse?.ok) return <Offline />;
-  const capabilities = (await capabilitiesResponse.json()) as { profile: string; sandbox: string; database: string; models: Record<string, string> };
+  const capabilities = (await capabilitiesResponse.json()) as {
+    profile: string;
+    sandbox: string;
+    database: string;
+    database_mode?: string;
+    models: Record<string, string>;
+  };
   return (
     <Shell name={desk.name} projects={desk.projects} current="/settings">
       <SettingsDesk name={desk.name} capabilities={capabilities} />
