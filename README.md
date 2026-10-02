@@ -39,15 +39,17 @@ pnpm dev
 
 Open `http://127.0.0.1:3011`. Sign in with a display name. That name is the local account. This is not institutional sign-in.
 
+The sidebar section How to use is a step-by-step explanation of every screen, written for someone who is not a programmer. The same text is in [docs/HOW_TO_USE.md](docs/HOW_TO_USE.md).
+
 The three demonstration projects are ecology measurements, a trajectory distance, and an assay table. Their faults are injected and labelled. They are teaching fixtures, not recovered publications.
 
 ## Limits that are part of the design
 
 - Only the three admitted demonstration snapshots may execute. Any other notebook is refused. No operating-system sandbox has been tested, so the runner does not fall back to executing an arbitrary upload on the host.
 - The database is SQLite with application-enforced account separation. PostgreSQL row-level security is not claimed.
-- GitHub, Slack, Google Calendar, Colab, and a RETRACE MCP server are `NEEDS_CONFIGURATION`. Internal calendar events and ICS export work without Google.
+- GitHub is operational when the workstation `gh` login is a person. Export writes a project to a repository that account can write, and refuses `FrankAsanteVanLaarhoven/RetraceOS`. Slack shares a title only after that person connects a workspace token. Google Calendar OAuth and Colab stay `NEEDS_CONFIGURATION`. A notebook can be downloaded and opened in the person's own Colab; notebooks are not sent to Colab to run. The calendar file can be imported into the person's own Google Calendar. Local tools can read the signed-in person's project names and questions. They cannot run a notebook. The desk does not show the tool address. A private client file is written under `data/mcp/` and is not committed.
 - Repairs in this build come from a deterministic diagnoser. A model key present in the environment is reported as `CONFIGURED_NOT_USED` and is not called.
-- English is the authored interface. Thirty-five other locales are catalogued, including Urdu as right to left, and remain `NOT_REVIEWED`. Choosing one changes writing direction and leaves the sentences in English.
+- English is the authored source language. The other 35 locales are interface drafts and remain `NOT_REVIEWED`. Choosing one changes the interface copy and, for Arabic, Hebrew, Persian, and Urdu, the writing direction. Project names, notebooks, and scientific records stay in their source language.
 - Evidence export is a ZIP with a Workflow Run RO-Crate subset. It is not a certified full RO-Crate profile.
 
 The quality record is `docs/quality/GATE.md`. The release record is `docs/evidence/RELEASE_DECISION.md`.

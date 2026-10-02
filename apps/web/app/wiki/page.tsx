@@ -11,9 +11,6 @@ export default async function WikiPage() {
   if (desk.offline) return <Offline />;
   return (
     <Shell name={desk.name} projects={desk.projects} current="/wiki">
-      <p className="eyebrow">Project record</p>
-      <h1>Record</h1>
-      <p className="lede">Pages are assembled from the snapshot, the contract, and the runs. Missing evidence stays an abstention.</p>
       <WikiDesk projects={desk.projects} />
     </Shell>
   );

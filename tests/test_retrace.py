@@ -7,13 +7,14 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 from retrace.api import create_app
 from retrace.classify import assert_label_allowed
 from retrace.errors import RetraceError
 from retrace.models import ResultContract
-from retrace.store import Proposal
+from retrace.store import Proposal, Store
 from retrace.verifier import verify
 
 ORIGIN = {"Origin": "http://127.0.0.1:3011"}
@@ -399,4 +400,311 @@ def test_layout_conflict_and_catalogue(client: TestClient) -> None:
     urdu = next(item for item in locales["locales"] if item["tag"] == "ur")
     assert urdu["direction"] == "rtl"
     connectors = client.get("/api/connectors").json()["connectors"]
-    assert {item["status"] for item in connectors} == {"NEEDS_CONFIGURATION"}
+    by_id = {item["id"]: item for item in connectors}
+    assert set(by_id) == {"github", "slack", "google_calendar", "colab", "mcp"}
+    assert by_id["slack"]["status"] == "NEEDS_CONFIGURATION"
+    assert "Nothing is sent to Slack" in by_id["slack"]["detail"]
+    assert by_id["google_calendar"]["status"] == "NEEDS_CONFIGURATION"
+    google_hrefs = {item["href"] for item in by_id["google_calendar"]["actions"]}
+    assert {"/calendar", "/api/calendar.ics", "https://calendar.google.com/calendar/r"} <= google_hrefs
+    assert by_id["colab"]["status"] == "NEEDS_CONFIGURATION"
+    assert "Notebooks are not sent to Colab" in by_id["colab"]["detail"]
+    assert by_id["mcp"]["status"] == "OPERATIONAL"
+    assert "cannot run a notebook" in by_id["mcp"]["detail"]
+    assert "127.0.0.1" not in by_id["mcp"]["detail"]
+    assert "http" not in by_id["mcp"]["detail"]
+    assert by_id["mcp"]["notes"][2].startswith("Read the name and question")
+    assert by_id["github"]["status"] in {"OPERATIONAL", "NEEDS_CONFIGURATION"}
+    assert "RetraceOS" not in by_id["github"]["detail"]
+    if by_id["github"]["status"] == "OPERATIONAL":
+        account = by_id["github"]["account"]
+        assert account and account in by_id["github"]["detail"]
+        assert by_id["github"]["actions"][0]["href"] == f"https://github.com/{account}"
+    started = client.post(
+        "/mcp",
+        json={
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {"protocolVersion": "2024-11-05", "capabilities": {}, "clientInfo": {"name": "test", "version": "0"}},
+        },
+    )
+    assert started.status_code == 200, started.text
+    assert started.json()["result"]["serverInfo"]["name"] == "RETRACE"
+    listed = client.post("/mcp", json={"jsonrpc": "2.0", "id": 2, "method": "tools/list"})
+    names = {item["name"] for item in listed.json()["result"]["tools"]}
+    assert names == {"retrace_health", "retrace_connectors", "retrace_projects", "retrace_project"}
+    health = client.post("/mcp", json={"jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": {"name": "retrace_health", "arguments": {}}})
+    assert health.json()["result"]["isError"] is False
+    assert "RETRACE" in health.json()["result"]["content"][0]["text"]
+    refused = client.post("/mcp", json={"jsonrpc": "2.0", "id": 4, "method": "tools/call", "params": {"name": "retrace_run", "arguments": {}}})
+    assert refused.json()["result"]["isError"] is True
+    notice = client.post("/mcp", json={"jsonrpc": "2.0", "method": "notifications/initialized"})
+    assert notice.status_code == 202
+    dutch = next(item for item in locales["locales"] if item["tag"] == "nl")
+    assert dutch["catalogue_status"] == "INTERFACE_DRAFT"
+    assert dutch["linguistic_review"] == "NOT_REVIEWED"
+    assert dutch["endonym"] == "Nederlands"
+
+
+def _completed(args: list[str], code: int = 0, stdout: str = "", stderr: str = "") -> object:
+    return type("Completed", (), {"args": args, "returncode": code, "stdout": stdout, "stderr": stderr})()
+
+
+def test_export_refuses_the_application_repository() -> None:
+    from retrace.connectors import export_github
+
+    def run(*_args: object, **_kwargs: object) -> object:
+        raise AssertionError("the application repository must be refused before GitHub is called")
+
+    with pytest.raises(RetraceError) as caught:
+        export_github(
+            login="FrankAsanteVanLaarhoven",
+            repository="FrankAsanteVanLaarhoven/RetraceOS",
+            create=True,
+            files={"retrace/" + "ab" * 16 + "/README.md": "hello"},
+            run=run,
+        )
+    assert caught.value.code == "app_repository"
+
+
+def test_export_writes_a_private_repository_for_the_signed_in_account() -> None:
+    from retrace.connectors import export_github
+
+    calls: list[tuple[list[str], str | None]] = []
+    state = {"created": False}
+
+    def run(args: list[str], input_text: str | None = None, timeout: int = 20) -> object:
+        calls.append((args, input_text))
+        if args[:3] == ["gh", "api", "repos/ada/notes"] and "--method" not in args:
+            if not state["created"]:
+                return _completed(args, 1, stderr="HTTP 404")
+            return _completed(
+                args,
+                0,
+                stdout=json.dumps({"full_name": "ada/notes", "default_branch": "main", "permissions": {"push": True}}),
+            )
+        if args[:3] == ["gh", "repo", "create"]:
+            assert args[3] == "ada/notes"
+            assert "--private" in args
+            assert "--public" not in args
+            state["created"] = True
+            return _completed(args, 0, stdout="https://github.com/ada/notes\n")
+        if "/branches/" in args[2] or ("/contents/" in args[2] and "--method" not in args):
+            return _completed(args, 1, stderr="HTTP 404")
+        if "--method" in args:
+            assert input_text is not None
+            body = json.loads(input_text)
+            assert body["message"] == "Export a project from RETRACE for sharing"
+            assert "reproduction" not in body["message"]
+            return _completed(args, 0, stdout="{}")
+        raise AssertionError(args)
+
+    result = export_github(
+        login="ada",
+        repository="ada/notes",
+        create=True,
+        files={"retrace/" + "ab" * 16 + "/README.md": "hello\n", "retrace/" + "ab" * 16 + "/notebook.ipynb": "{}\n"},
+        run=run,
+    )
+    assert result["repository"] == "ada/notes"
+    assert result["url"] == "https://github.com/ada/notes"
+    assert "RetraceOS" not in result["url"]
+    assert "colab.research.google.com/github/ada/notes/" in result["colab_url"]
+    assert any(item[0][:3] == ["gh", "repo", "create"] for item in calls)
+    puts = [json.loads(item[1] or "{}") for item in calls if item[1]]
+    assert puts[0].get("branch") is None
+    assert puts[1].get("branch") == "main"
+
+
+def test_account_export_download_and_slack_share(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    from retrace.store import ConnectorSecret
+
+    sign_in(client, "Ada Lovelace")
+    view = client.post("/api/demos/assay", headers=ORIGIN).json()
+    project_id = view["project"]["id"]
+    monkeypatch.setattr("retrace.api.github_login", lambda: "ada")
+    refused = client.post(
+        "/api/connectors/github/export",
+        json={"project_id": project_id, "repository": "frankasantevanlaarhoven/RetraceOS", "create": True},
+        headers=ORIGIN,
+    )
+    assert refused.status_code == 400, refused.text
+    assert refused.json()["error"] == "app_repository"
+    seen: dict[str, object] = {}
+
+    def fake_export(**kwargs: object) -> dict[str, str]:
+        seen.update(kwargs)
+        return {
+            "repository": "ada/notes",
+            "url": "https://github.com/ada/notes",
+            "notebook_url": "https://github.com/ada/notes/blob/main/retrace/" + project_id + "/notebook.ipynb",
+            "colab_url": "https://colab.research.google.com/github/ada/notes/blob/main/retrace/" + project_id + "/notebook.ipynb",
+            "message": "Exported to ada/notes.",
+            "next": "This export does not rerun the notebook.",
+        }
+
+    monkeypatch.setattr("retrace.api.export_github", fake_export)
+    exported = client.post(
+        "/api/connectors/github/export",
+        json={"project_id": project_id, "repository": "ada/notes", "create": False},
+        headers=ORIGIN,
+    )
+    assert exported.status_code == 200, exported.text
+    assert seen["login"] == "ada"
+    assert seen["repository"] == "ada/notes"
+    files = seen["files"]
+    assert isinstance(files, dict)
+    assert any(path.endswith(".ipynb") for path in files)
+    assert "not a reproduction result" in next(text for path, text in files.items() if path.endswith("README.md"))
+    notebook = client.get(f"/api/projects/{project_id}/notebook")
+    assert notebook.status_code == 200, notebook.text
+    assert notebook.headers["content-type"].startswith("application/x-ipynb+json")
+    assert "attachment;" in notebook.headers["content-disposition"]
+    assert notebook.text.lstrip().startswith("{")
+
+    def fake_probe(token: str) -> dict[str, str] | None:
+        return {"team": "Ada Lab"} if token == "xoxb-test-token" else None
+
+    sent: dict[str, str] = {}
+
+    def fake_post(token: str, channel: str, text: str) -> None:
+        sent["token"] = token
+        sent["channel"] = channel
+        sent["text"] = text
+
+    monkeypatch.setattr("retrace.connectors.probe_slack", fake_probe)
+    monkeypatch.setattr("retrace.api.probe_slack", fake_probe)
+    monkeypatch.setattr("retrace.api.post_slack", fake_post)
+    connected = client.post("/api/connectors/slack", json={"token": "xoxb-test-token"}, headers=ORIGIN)
+    assert connected.status_code == 200, connected.text
+    assert "xoxb-test-token" not in connected.text
+    assert connected.json()["account"] == "Ada Lab"
+    assert connected.json()["status"] == "OPERATIONAL"
+    store = client.app.state.service.store
+    with store.session() as db:
+        saved = db.get(ConnectorSecret, (client.app.state.service.principal_from_token(client.cookies.get("retrace_session"))["id"], "slack"))
+        assert saved is not None
+        assert saved.secret == "xoxb-test-token"
+    shared = client.post(
+        "/api/connectors/slack/share",
+        json={"project_id": project_id, "channel": "#lab-notes"},
+        headers=ORIGIN,
+    )
+    assert shared.status_code == 200, shared.text
+    assert "xoxb-test-token" not in shared.text
+    assert sent["token"] == "xoxb-test-token"
+    assert sent["channel"] == "lab-notes"
+    assert "not a reproduction result" in sent["text"]
+    assert "notebook" in sent["text"].lower()
+    sign_in(client, "Grace Hopper")
+    denied = client.get(f"/api/projects/{project_id}/notebook")
+    assert denied.status_code == 404
+    denied_export = client.post(
+        "/api/connectors/github/export",
+        json={"project_id": project_id, "repository": "ada/notes", "create": False},
+        headers=ORIGIN,
+    )
+    assert denied_export.status_code == 404
+
+
+def test_mcp_reads_only_the_signed_in_projects(client: TestClient) -> None:
+    sign_in(client, "Ada Lovelace")
+    ada = client.post("/api/demos/assay", headers=ORIGIN).json()
+    ada_id = ada["project"]["id"]
+    listed = client.get("/api/connectors")
+    assert listed.status_code == 200
+    assert "Bearer" not in listed.text
+    assert "127.0.0.1" not in listed.text
+    store = client.app.state.service.store
+    principal = client.app.state.service.principal_from_token(client.cookies.get("retrace_session"))
+    assert principal is not None
+    config_path = store.database.parent / "mcp" / f"{principal['id']}.json"
+    config = json.loads(config_path.read_text(encoding="utf-8"))
+    header = {"Authorization": config["authorization"]}
+    assert config["authorization"] not in listed.text
+    with TestClient(client.app) as stranger:
+        blocked = stranger.post("/mcp", json={"jsonrpc": "2.0", "id": 7, "method": "tools/call", "params": {"name": "retrace_projects", "arguments": {}}})
+    assert blocked.json()["result"]["isError"] is True
+    assert "Assay table" not in blocked.json()["result"]["content"][0]["text"]
+    opened = client.post(
+        "/mcp",
+        json={"jsonrpc": "2.0", "id": 8, "method": "tools/call", "params": {"name": "retrace_projects", "arguments": {}}},
+        headers=header,
+    )
+    assert opened.status_code == 200, opened.text
+    assert opened.json()["result"]["isError"] is False
+    assert "Assay table" in opened.json()["result"]["content"][0]["text"]
+    one = client.post(
+        "/mcp",
+        json={"jsonrpc": "2.0", "id": 9, "method": "tools/call", "params": {"name": "retrace_project", "arguments": {"project_id": ada_id}}},
+        headers=header,
+    )
+    body = json.loads(one.json()["result"]["content"][0]["text"])
+    assert body["name"] == "Assay table"
+    assert body["note"].endswith("not a reproduction result.")
+    assert "cells" not in one.text
+    sign_in(client, "Grace Hopper")
+    grace = client.post("/api/demos/ecology", headers=ORIGIN).json()
+    foreign = client.post(
+        "/mcp",
+        json={"jsonrpc": "2.0", "id": 10, "method": "tools/call", "params": {"name": "retrace_project", "arguments": {"project_id": grace["project"]["id"]}}},
+        headers=header,
+    )
+    assert foreign.json()["result"]["isError"] is True
+    assert "Ecology measurements" not in foreign.json()["result"]["content"][0]["text"]
+
+
+def test_preferences_round_trip_locale(client: TestClient) -> None:
+    sign_in(client)
+    saved = client.put(
+        "/api/preferences",
+        json={"theme": "dark", "density": "compact", "zone": "Europe/London", "locale": "ur"},
+        headers=ORIGIN,
+    )
+    assert saved.status_code == 200, saved.text
+    assert saved.json()["locale"] == "ur"
+    assert saved.json()["theme"] == "dark"
+    kept = client.put(
+        "/api/preferences",
+        json={"theme": "light", "density": "comfortable", "zone": "UTC"},
+        headers=ORIGIN,
+    )
+    assert kept.status_code == 200, kept.text
+    assert kept.json()["locale"] == "ur"
+    assert kept.json()["theme"] == "light"
+    rejected = client.put(
+        "/api/preferences",
+        json={"theme": "light", "density": "comfortable", "zone": "UTC", "locale": "xx"},
+        headers=ORIGIN,
+    )
+    assert rejected.status_code == 400
+    assert rejected.json()["error"] == "bad_locale"
+    visible = client.get("/api/preferences")
+    assert visible.status_code == 200
+    assert visible.json()["signed_in"] is True
+    assert visible.json()["locale"] == "ur"
+
+
+def test_preferences_without_a_session_do_not_require_sign_in(client: TestClient) -> None:
+    response = client.get("/api/preferences")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["signed_in"] is False
+    assert body["locale"] == "en"
+    assert body["theme"] == "system"
+
+
+def test_existing_preferences_gain_locale(tmp_path: Path) -> None:
+    database = tmp_path / "old.sqlite"
+    engine = create_engine(f"sqlite:///{database}")
+    with engine.begin() as connection:
+        connection.exec_driver_sql(
+            "CREATE TABLE preferences (principal_id VARCHAR(36) PRIMARY KEY, theme VARCHAR(20), density VARCHAR(20), zone VARCHAR(80))"
+        )
+        connection.exec_driver_sql("INSERT INTO preferences (principal_id, theme, density, zone) VALUES ('p', 'dark', 'compact', 'UTC')")
+    Store(database, tmp_path / "objects")
+    with engine.connect() as connection:
+        names = {row[1] for row in connection.exec_driver_sql("PRAGMA table_info(preferences)")}
+        assert "locale" in names
+        assert connection.exec_driver_sql("SELECT locale FROM preferences").scalar() == "en"

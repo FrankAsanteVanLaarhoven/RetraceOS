@@ -11,6 +11,20 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 
 from retrace import __version__
+from retrace.connectors import (
+    clean_channel,
+    clean_slack_token,
+    connector_rows,
+    export_github,
+    github_files,
+    github_login,
+    handle_mcp,
+    notebook_filename,
+    post_slack,
+    probe_slack,
+    slack_connector,
+    slack_text,
+)
 from retrace.errors import RetraceError
 from retrace.store import Store
 from retrace.uiplan import catalogue, parse_prompt, validate_plan
@@ -48,13 +62,7 @@ def capabilities() -> dict:
             "repairs": "deterministic-diagnoser",
             "note": "A configured key is not called. Notebooks and results are not sent to a model provider by this build.",
         },
-        "connectors": [
-            {"id": "github", "status": "NEEDS_CONFIGURATION", "detail": "No GitHub App credentials are configured."},
-            {"id": "slack", "status": "NEEDS_CONFIGURATION", "detail": "No Slack workspace installation is configured."},
-            {"id": "google_calendar", "status": "NEEDS_CONFIGURATION", "detail": "No Google Calendar OAuth client is configured. Internal events and ICS export work without it."},
-            {"id": "colab", "status": "NEEDS_CONFIGURATION", "detail": "No Colab session is connected. This is not a hosted execution backend."},
-            {"id": "mcp", "status": "NEEDS_CONFIGURATION", "detail": "RETRACE does not expose an MCP tool server in this build."},
-        ],
+        "connectors": connector_rows(),
     }
 
 
@@ -140,12 +148,129 @@ def create_app(database: Path, objects: Path) -> FastAPI:
         return {
             "locales": rows,
             "shipped_interface_locale": "en",
-            "note": "Other locales are catalogued. Their interface is not translated and has not had linguistic review. Urdu is included as right-to-left.",
+            "note": "English is the authored source language. Other locales are interface drafts and have not had linguistic review. Arabic, Hebrew, Persian, and Urdu are right to left. Project names, notebooks, and scientific records stay in their source language.",
         }
 
+    def slack_token_for(request: Request) -> str | None:
+        person = service.principal_from_token(request.cookies.get("retrace_session"))
+        if person is None:
+            return None
+        saved = service.store.connector_secret(person["id"], "slack")
+        return saved[0] if saved else ""
+
     @app.get("/api/connectors")
-    def connectors() -> dict:
-        return {"connectors": capabilities()["connectors"]}
+    def connectors(request: Request) -> dict:
+        person = service.principal_from_token(request.cookies.get("retrace_session"))
+        if person is not None:
+            service.ensure_mcp_client(person)
+        return {"connectors": connector_rows(slack_token_for(request))}
+
+    @app.post("/api/connectors/github/export")
+    def github_export(request: Request, payload: dict) -> dict:
+        guard(request)
+        person = principal(request)
+        login = github_login()
+        if login is None:
+            raise RetraceError(
+                "github_signed_out",
+                "No GitHub account is signed in on this computer.",
+                "Sign in with the GitHub command on this machine, then try the export again.",
+                status=409,
+            )
+        pack = service.share_notebook(person, str(payload.get("project_id") or ""))
+        files = github_files(
+            pack["project_id"],
+            notebook_filename(pack["notebook_path"]),
+            pack["title"],
+            pack["question"],
+            pack["notebook"],
+        )
+        return export_github(
+            login=login,
+            repository=str(payload.get("repository") or ""),
+            create=bool(payload.get("create")),
+            files=files,
+        )
+
+    @app.post("/api/connectors/slack")
+    def slack_connect(request: Request, payload: dict) -> dict:
+        guard(request)
+        person = principal(request)
+        token = clean_slack_token(str(payload.get("token") or ""))
+        found = probe_slack(token)
+        if found is None:
+            raise RetraceError(
+                "bad_slack_token",
+                "Slack did not accept that token.",
+                "Check the token from your own workspace. It was not saved.",
+            )
+        service.store.save_connector_secret(person["id"], "slack", token, found["team"])
+        row = slack_connector(token)
+        if token in json.dumps(row):
+            raise RetraceError("slack_refused", "The workspace connection could not be saved.", "Try the token again.", status=500)
+        return row
+
+    @app.post("/api/connectors/slack/disconnect")
+    def slack_disconnect(request: Request) -> dict:
+        guard(request)
+        person = principal(request)
+        service.store.clear_connector_secret(person["id"], "slack")
+        return slack_connector("")
+
+    @app.post("/api/connectors/slack/share")
+    def slack_share(request: Request, payload: dict) -> dict:
+        guard(request)
+        person = principal(request)
+        saved = service.store.connector_secret(person["id"], "slack")
+        if saved is None:
+            raise RetraceError(
+                "slack_signed_out",
+                "Connect your Slack workspace before sharing.",
+                "Paste a token from your own Slack app.",
+                status=409,
+            )
+        token, _label = saved
+        channel = clean_channel(str(payload.get("channel") or ""))
+        pack = service.share_notebook(person, str(payload.get("project_id") or ""))
+        post_slack(token, channel, slack_text(pack["title"], pack["question"]))
+        return {
+            "message": f"Shared {pack['title']} to {channel}.",
+            "next": "The message is the project title and question. The notebook was not sent, and this is not a reproduction result.",
+        }
+
+    @app.get("/api/projects/{project_id}/notebook")
+    def project_notebook(request: Request, project_id: str) -> Response:
+        pack = service.share_notebook(principal(request), project_id)
+        filename = notebook_filename(pack["notebook_path"])
+        return Response(
+            pack["notebook"].encode("utf-8"),
+            media_type="application/x-ipynb+json",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+
+    @app.post("/mcp")
+    async def mcp(request: Request) -> Response:
+        try:
+            message = await request.json()
+        except json.JSONDecodeError:
+            return JSONResponse({"jsonrpc": "2.0", "id": None, "error": {"code": -32700, "message": "Parse error"}}, status_code=400)
+        if not isinstance(message, dict):
+            return JSONResponse({"jsonrpc": "2.0", "id": None, "error": {"code": -32600, "message": "Invalid request"}}, status_code=400)
+        header = request.headers.get("authorization") or ""
+        bearer = header[7:].strip() if header.lower().startswith("bearer ") else ""
+        person = service.principal_from_mcp_key(bearer) if bearer else service.principal_from_token(request.cookies.get("retrace_session"))
+        if person is None:
+            result = handle_mcp(message)
+        else:
+            result = handle_mcp(
+                message,
+                account=person,
+                read_projects=lambda: service.mcp_projects(person),
+                read_project=lambda project_id: service.mcp_project(person, project_id),
+            )
+        if result is None:
+            return Response(status_code=202)
+        return JSONResponse(result)
 
     @app.get("/api/ui-plan/catalogue")
     def ui_catalogue() -> dict:
@@ -175,16 +300,23 @@ def create_app(database: Path, objects: Path) -> FastAPI:
 
     @app.get("/api/preferences")
     def get_preferences(request: Request) -> dict:
-        return service.preferences(principal(request))
+        found = service.principal_from_token(request.cookies.get("retrace_session"))
+        if found is None:
+            return {"theme": "system", "density": "comfortable", "zone": "UTC", "locale": "en", "signed_in": False}
+        saved = service.preferences(found)
+        saved["signed_in"] = True
+        return saved
 
     @app.put("/api/preferences")
     def put_preferences(request: Request, payload: dict) -> dict:
         guard(request)
+        raw_locale = payload.get("locale")
         return service.save_preferences(
             principal(request),
             str(payload.get("theme", "system")),
             str(payload.get("density", "comfortable")),
             str(payload.get("zone", "UTC")),
+            None if raw_locale is None else str(raw_locale),
         )
 
     @app.get("/api/projects")

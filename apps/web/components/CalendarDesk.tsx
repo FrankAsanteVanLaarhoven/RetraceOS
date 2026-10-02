@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useDesk } from "@/components/DeskProvider";
 import { Notice } from "@/components/Status";
 import type { ApiError } from "@/lib/types";
 
@@ -9,17 +10,16 @@ export function CalendarDesk({
 }: {
   initial: Array<{ id: string; title: string; start_utc: string; zone: string }>;
 }) {
+  const { t, prefs } = useDesk();
   const [events, setEvents] = useState(initial);
   const [error, setError] = useState<ApiError | null>(null);
   const [pending, setPending] = useState(false);
 
   return (
     <>
-      <p className="eyebrow">Internal schedule</p>
-      <h1>Calendar</h1>
-      <p className="lede">
-        Times are stored in UTC. Google Calendar is not connected. If a local time happens twice, RETRACE asks which instant you mean.
-      </p>
+      <p className="eyebrow">{t("calendar.eyebrow")}</p>
+      <h1>{t("calendar.title")}</h1>
+      <p className="lede">{t("calendar.lede")}</p>
       {error?.message ? <Notice message={error.message} next={error.next} /> : null}
       <form
         className="panel"
@@ -49,33 +49,33 @@ export function CalendarDesk({
         }}
       >
         <div className="field">
-          <label htmlFor="title">Title</label>
-          <input id="title" name="title" required defaultValue="Review the repair" />
+          <label htmlFor="title">{t("calendar.titleField")}</label>
+          <input id="title" name="title" required defaultValue={t("calendar.defaultTitle")} />
         </div>
         <div className="field">
-          <label htmlFor="local_start">Local time</label>
-          <input id="local_start" name="local_start" required placeholder="2026-11-01T01:30" />
+          <label htmlFor="local_start">{t("calendar.local")}</label>
+          <input id="local_start" name="local_start" required placeholder="2026-11-01T01:30" className="keep-ltr" />
         </div>
         <div className="field">
-          <label htmlFor="zone">Time zone</label>
-          <input id="zone" name="zone" required defaultValue="Europe/London" />
+          <label htmlFor="zone">{t("calendar.zone")}</label>
+          <input id="zone" name="zone" required defaultValue={prefs.zone || "Europe/London"} className="keep-ltr" />
         </div>
         <div className="field">
-          <label htmlFor="fold">Fold, if the hour repeats</label>
+          <label htmlFor="fold">{t("calendar.fold")}</label>
           <select id="fold" name="fold" defaultValue="">
-            <option value="">Not specified</option>
-            <option value="0">Earlier instant</option>
-            <option value="1">Later instant</option>
+            <option value="">{t("calendar.unspecified")}</option>
+            <option value="0">{t("calendar.earlier")}</option>
+            <option value="1">{t("calendar.later")}</option>
           </select>
         </div>
         <button className="primary" type="submit" disabled={pending}>
-          {pending ? "Saving…" : "Add to the internal calendar"}
+          {pending ? t("calendar.saving") : t("calendar.add")}
         </button>
       </form>
       <ul>
         {events.map((event) => (
           <li key={event.id}>
-            {event.title} · {event.start_utc} UTC · organised in {event.zone}
+            {t("calendar.line", { title: event.title, utc: event.start_utc, zone: event.zone })}
           </li>
         ))}
       </ul>

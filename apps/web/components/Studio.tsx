@@ -2,22 +2,31 @@
 
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
+import { useDesk } from "@/components/DeskProvider";
 import { Notice, Outcome } from "@/components/Status";
 import { notebookCode, statusLabel, type ApiError, type ProjectView, type Proposal } from "@/lib/types";
 
+const NOTES: Record<string, string> = {
+  "Lineage and the case brief.": "studio.note.lineage",
+  "The repair beside its checks.": "studio.note.repair",
+  "The evidence bundle and the checks it carries.": "studio.note.evidence",
+  "The notebook and the proposed change.": "studio.note.notebook",
+};
+
 const TABS = [
-  ["snapshot", "Snapshot"],
-  ["contract", "Contract"],
-  ["review", "Review"],
-  ["run", "Run"],
-  ["evidence", "Evidence"],
-  ["lineage", "Lineage"],
+  ["snapshot", "tab.snapshot"],
+  ["contract", "tab.contract"],
+  ["review", "tab.review"],
+  ["run", "tab.run"],
+  ["evidence", "tab.evidence"],
+  ["lineage", "tab.lineage"],
 ] as const;
 
 type Tab = (typeof TABS)[number][0];
 
 export function Studio({ initial }: { initial: ProjectView }) {
   const router = useRouter();
+  const { t } = useDesk();
   const [view, setView] = useState(initial);
   const [tab, setTab] = useState<Tab>("snapshot");
   const [pending, setPending] = useState<string | null>(null);
@@ -77,10 +86,10 @@ export function Studio({ initial }: { initial: ProjectView }) {
   return (
     <>
       <p className="eyebrow">
-        {view.project.demo ? "Demonstration · injected faults" : "Imported package"} · {view.project.discipline || "Unspecified field"}
+        {view.project.demo ? t("studio.demo") : t("studio.imported")} · {view.project.discipline || t("studio.unspecified")}
       </p>
       <h1>{view.project.name}</h1>
-      <p className="lede">{view.project.question || "No question has been recorded for this package."}</p>
+      <p className="lede">{view.project.question || t("studio.noQuestion")}</p>
       {error?.message ? <Notice message={error.message} next={error.next} /> : null}
       <form
         className="prompt"
@@ -99,21 +108,25 @@ export function Studio({ initial }: { initial: ProjectView }) {
         }}
       >
         <label className="k" htmlFor="prompt">
-          Arrange
+          {t("studio.arrange")}
         </label>
         <input
           id="prompt"
           value={prompt}
           onChange={(event) => setPrompt(event.target.value)}
-          placeholder="Compare the repair and the checks"
+          placeholder={t("studio.placeholder")}
         />
         <button className="ghost" type="submit" disabled={pending !== null}>
-          {pending === "prompt" ? "Checking…" : "Apply layout"}
+          {pending === "prompt" ? t("studio.checking") : t("studio.apply")}
         </button>
       </form>
-      {promptNote ? <p className="missing">{promptNote} The prompt bar cannot approve or run.</p> : null}
+      {promptNote ? (
+        <p className="missing">
+          {NOTES[promptNote] ? t(NOTES[promptNote]) : promptNote} {t("studio.promptNote")}
+        </p>
+      ) : null}
 
-      <div className="tabs" role="tablist" aria-label="Analysis stages">
+      <div className="tabs" role="tablist" aria-label={t("studio.tabs")}>
         {TABS.map(([id, label]) => (
           <button
             key={id}
@@ -136,7 +149,7 @@ export function Studio({ initial }: { initial: ProjectView }) {
               document.getElementById(`tab-${nextId}`)?.focus();
             }}
           >
-            {label}
+            {t(label)}
           </button>
         ))}
       </div>
@@ -193,14 +206,14 @@ export function Studio({ initial }: { initial: ProjectView }) {
       </div>
 
       <details className="panel" style={{ marginTop: 16 }}>
-        <summary>Arrange panels</summary>
-        <p>Drag a row, or use the buttons. Saving does not approve a repair or hide the status of a run.</p>
+        <summary>{t("studio.arrangePanels")}</summary>
+        <p>{t("studio.arrangeHelp")}</p>
         <div className="actions">
           <button className="ghost" type="button" onClick={() => { const previous = past.at(-1); if (!previous) return; setPast((items) => items.slice(0, -1)); setFuture((items) => [panels, ...items]); setPanels(previous); }}>
-            Undo
+            {t("studio.undo")}
           </button>
           <button className="ghost" type="button" onClick={() => { const next = future[0]; if (!next) return; setFuture((items) => items.slice(1)); setPast((items) => [...items, panels]); setPanels(next); }}>
-            Redo
+            {t("studio.redo")}
           </button>
           <button
             className="primary"
@@ -222,7 +235,7 @@ export function Studio({ initial }: { initial: ProjectView }) {
               })
             }
           >
-            {pending === "layout" ? "Saving…" : "Save arrangement"}
+            {pending === "layout" ? t("studio.saving") : t("studio.save")}
           </button>
         </div>
         <ol>
@@ -240,12 +253,12 @@ export function Studio({ initial }: { initial: ProjectView }) {
                 setDrag(null);
               }}
             >
-              {panel}
+              {t(`panel.${panel}`)}
               <button className="text-button" type="button" onClick={() => move(panel, -1)}>
-                Move {panel} up
+                {t("studio.moveUp", { name: t(`panel.${panel}`) })}
               </button>
               <button className="text-button" type="button" onClick={() => move(panel, 1)}>
-                Move {panel} down
+                {t("studio.moveDown", { name: t(`panel.${panel}`) })}
               </button>
             </li>
           ))}
@@ -255,7 +268,7 @@ export function Studio({ initial }: { initial: ProjectView }) {
       <div className="timeline">
         {view.events.map((event, index) => (
           <article key={`${event.at}-${index}`}>
-            <time dateTime={event.at ?? undefined}>{event.at ?? "Undated"}</time>
+            <time dateTime={event.at ?? undefined}>{event.at ?? t("studio.undated")}</time>
             <p>{event.summary}</p>
           </article>
         ))}
@@ -265,19 +278,18 @@ export function Studio({ initial }: { initial: ProjectView }) {
 }
 
 function Snapshot({ view, code }: { view: ProjectView; code: string }) {
+  const { t } = useDesk();
   return (
     <>
-      <h2>Untouched snapshot</h2>
-      <p>
-        Execution on this workstation is {view.snapshot.allowlisted ? "limited to this admitted demonstration" : "turned off. No tested sandbox is configured"}.
-      </p>
+      <h2>{t("snap.title")}</h2>
+      <p>{view.snapshot.allowlisted ? t("snap.limited") : t("snap.off")}</p>
       <p className="hash">{view.snapshot.content_hash}</p>
       <table>
         <thead>
           <tr>
-            <th>File</th>
-            <th>SHA-256</th>
-            <th>Bytes</th>
+            <th>{t("snap.file")}</th>
+            <th>{t("snap.hash")}</th>
+            <th>{t("snap.bytes")}</th>
           </tr>
         </thead>
         <tbody>
@@ -290,7 +302,7 @@ function Snapshot({ view, code }: { view: ProjectView; code: string }) {
           ))}
         </tbody>
       </table>
-      <h3>Notebook</h3>
+      <h3>{t("snap.notebook")}</h3>
       <pre>{code}</pre>
     </>
   );
@@ -307,34 +319,35 @@ function Contracts({
   onApprove: (id: string) => void;
   onSelect: (id: string) => void;
 }) {
-  if (view.contracts.length === 0) return <p>No result contract has been recorded. Nothing can be called reproduced.</p>;
+  const { t } = useDesk();
+  if (view.contracts.length === 0) return <p>{t("contract.none")}</p>;
   return (
     <>
-      <h2>Result contracts</h2>
+      <h2>{t("contract.title")}</h2>
       {view.contracts.map((contract) => (
         <article key={contract.id} onClick={() => onSelect(contract.id)}>
           <h3>{contract.body.title}</h3>
           <Outcome status={contract.status} />
           <p>{contract.body.reference_note}</p>
           <p>
-            <span className="k">Population</span> {contract.body.population}
+            <span className="k">{t("contract.population")}</span> {contract.body.population}
           </p>
           <p>
-            <span className="k">Exclusions</span> {contract.body.exclusions}
+            <span className="k">{t("contract.exclusions")}</span> {contract.body.exclusions}
           </p>
           <table>
             <thead>
               <tr>
-                <th>Output</th>
-                <th>Expected</th>
-                <th>Unit</th>
+                <th>{t("contract.output")}</th>
+                <th>{t("contract.expected")}</th>
+                <th>{t("contract.unit")}</th>
               </tr>
             </thead>
             <tbody>
               {contract.body.outputs.map((output) => (
                 <tr key={output.name}>
                   <td>{output.name}</td>
-                  <td>{output.expected === null ? "Not supplied" : String(output.expected)}</td>
+                  <td>{output.expected === null ? t("contract.notSupplied") : String(output.expected)}</td>
                   <td>{output.unit}</td>
                 </tr>
               ))}
@@ -343,10 +356,10 @@ function Contracts({
           <p>{contract.body.limitations}</p>
           {contract.status === "draft" ? (
             <button className="primary" type="button" disabled={pending !== null} onClick={() => onApprove(contract.id)}>
-              {pending === contract.id ? "Approving…" : "Approve this contract"}
+              {pending === contract.id ? t("contract.approving") : t("contract.approve")}
             </button>
           ) : (
-            <p>Approved {contract.approved_at}. The repair cannot edit it.</p>
+            <p>{t("contract.approvedAt", { when: contract.approved_at ?? "" })}</p>
           )}
         </article>
       ))}
@@ -365,11 +378,12 @@ function Review({
   onApprove: (proposalId: string, contractId: string) => void;
   onSelect: (id: string) => void;
 }) {
+  const { t } = useDesk();
   const approvedContracts = view.contracts.filter((contract) => contract.status === "approved");
   return (
     <>
-      <h2>Proposed changes</h2>
-      <p>A mechanical repair and a change of method are not the same decision. Method changes stay labelled as reanalysis.</p>
+      <h2>{t("review.title")}</h2>
+      <p>{t("review.lede")}</p>
       {view.proposals.map((proposal) => (
         <ProposalCard
           key={proposal.id}
@@ -397,6 +411,7 @@ function ProposalCard({
   onApprove: (proposalId: string, contractId: string) => void;
   onSelect: () => void;
 }) {
+  const { t } = useDesk();
   const [contractId, setContractId] = useState(contracts[0]?.id ?? "");
   const reanalysis = proposal.classification === "methodological_reanalysis";
   return (
@@ -405,27 +420,28 @@ function ProposalCard({
       <Outcome status={proposal.classification} />
       <p>{proposal.rationale}</p>
       <p>
-        Author {proposal.author}
-        {proposal.injected ? " · injected demonstration trap" : " · diagnosed from the notebook"}
+        {t("review.author", { name: proposal.author })}
+        {" · "}
+        {proposal.injected ? t("review.injected") : t("review.diagnosed")}
       </p>
       <div className="split">
         <div>
-          <p className="k">Remove</p>
-          <pre>{proposal.find_text}</pre>
+          <p className="k">{t("review.remove")}</p>
+          <pre className="keep-ltr">{proposal.find_text}</pre>
         </div>
         <div>
-          <p className="k">Insert</p>
-          <pre>{proposal.replace_text}</pre>
+          <p className="k">{t("review.insert")}</p>
+          <pre className="keep-ltr">{proposal.replace_text}</pre>
         </div>
       </div>
-      {reanalysis ? <p>Approving this will not produce a reproduced status.</p> : null}
+      {reanalysis ? <p>{t("review.noRepro")}</p> : null}
       {contracts.length === 0 ? (
-        <p>Approve a contract before approving this repair.</p>
+        <p>{t("review.needContract")}</p>
       ) : (
         <div className="actions">
           <label>
-            Against
-            <select value={contractId} onChange={(event) => setContractId(event.target.value)} aria-label={`Contract for ${proposal.title}`}>
+            {t("review.against")}
+            <select value={contractId} onChange={(event) => setContractId(event.target.value)} aria-label={t("review.contractFor", { title: proposal.title })}>
               {contracts.map((contract) => (
                 <option key={contract.id} value={contract.id}>
                   {contract.title}
@@ -434,7 +450,7 @@ function ProposalCard({
             </select>
           </label>
           <button className="primary" type="button" disabled={pending !== null || !contractId} onClick={() => onApprove(proposal.id, contractId)}>
-            {pending === proposal.id ? "Approving…" : reanalysis ? "Approve as reanalysis" : "Approve this repair"}
+            {pending === proposal.id ? t("review.approving") : reanalysis ? t("review.approveReanalysis") : t("review.approveRepair")}
           </button>
         </div>
       )}
@@ -453,50 +469,51 @@ function Runs({
   onBaseline: () => void;
   onRun: (approvalId: string) => void;
 }) {
+  const { t } = useDesk();
   const live = view.approvals.filter((approval) => !approval.invalidated_at);
   return (
     <>
-      <h2>Run and compare</h2>
+      <h2>{t("run.title")}</h2>
       <div className="actions">
         <button className="ghost" type="button" disabled={pending !== null || !view.snapshot.allowlisted} onClick={onBaseline}>
-          {pending === "baseline" ? "Running the original…" : "Run the untouched snapshot"}
+          {pending === "baseline" ? t("run.runningOriginal") : t("run.original")}
         </button>
       </div>
-      {!view.snapshot.allowlisted ? <p>This package can be inspected. It will not run until a tested sandbox exists.</p> : null}
-      {live.length === 0 ? <p>No current approval. Approve a repair, then run that exact candidate.</p> : null}
+      {!view.snapshot.allowlisted ? <p>{t("run.noSandbox")}</p> : null}
+      {live.length === 0 ? <p>{t("run.noApproval")}</p> : null}
       <div className="actions">
         {live.map((approval) => {
           const proposal = view.proposals.find((item) => item.id === approval.proposal_id);
           return (
             <button key={approval.id} className="primary" type="button" disabled={pending !== null} onClick={() => onRun(approval.id)}>
-              {pending === approval.id ? "Running…" : `Run “${proposal?.title ?? "approved repair"}”`}
+              {pending === approval.id ? t("run.running") : t("run.button", { title: proposal?.title ?? t("run.approvedRepair") })}
             </button>
           );
         })}
       </div>
-      {view.runs.length === 0 ? <p>No runs yet.</p> : null}
+      {view.runs.length === 0 ? <p>{t("run.none")}</p> : null}
       {view.runs.map((run) => (
         <article key={run.id}>
           <Outcome status={run.verification_status} heading />
-          <p>Execution: {statusLabel(run.execution_status)}</p>
+          <p>{t("run.execution", { status: textStatus(run.execution_status, t) })}</p>
           <p>{run.explanation}</p>
           {run.checks.length > 0 ? (
             <table>
               <thead>
                 <tr>
-                  <th>Check</th>
-                  <th>Expected</th>
-                  <th>Actual</th>
-                  <th>Result</th>
+                  <th>{t("run.check")}</th>
+                  <th>{t("run.expected")}</th>
+                  <th>{t("run.actual")}</th>
+                  <th>{t("run.result")}</th>
                 </tr>
               </thead>
               <tbody>
                 {run.checks.map((check) => (
                   <tr key={check.name}>
                     <td>{check.name}</td>
-                    <td>{check.expected ?? "Not supplied"}</td>
-                    <td>{check.actual ?? "Not produced"}</td>
-                    <td>{check.passed ? "Passed" : "Failed"}</td>
+                    <td>{check.expected ?? t("contract.notSupplied")}</td>
+                    <td>{check.actual ?? t("run.notProduced")}</td>
+                    <td>{check.passed ? t("run.passed") : t("run.failed")}</td>
                   </tr>
                 ))}
               </tbody>
@@ -504,7 +521,7 @@ function Runs({
           ) : null}
           {run.log ? (
             <details>
-              <summary>Execution log</summary>
+              <summary>{t("run.log")}</summary>
               <pre>{run.log}</pre>
             </details>
           ) : null}
@@ -515,18 +532,17 @@ function Runs({
 }
 
 function Evidence({ view }: { view: ProjectView }) {
+  const { t } = useDesk();
   return (
     <>
-      <h2>Portable evidence</h2>
-      <p>
-        A downloaded bundle carries the snapshot, the patch, the contract, and a claimed status. Another account must rerun it. The claimed status is not a verification there.
-      </p>
-      <p>Agreement with the contract is not proof that a scientific conclusion is correct. A notebook can still emit internally consistent numbers.</p>
-      {view.runs.length === 0 ? <p>Finish a run before exporting evidence.</p> : null}
+      <h2>{t("evidence.title")}</h2>
+      <p>{t("evidence.body")}</p>
+      <p>{t("evidence.caveat")}</p>
+      {view.runs.length === 0 ? <p>{t("evidence.needRun")}</p> : null}
       <ul>
         {view.runs.map((run) => (
           <li key={run.id}>
-            <a href={`/api/projects/${view.project.id}/runs/${run.id}/bundle`}>{statusLabel(run.verification_status)} bundle</a>
+            <a href={`/api/projects/${view.project.id}/runs/${run.id}/bundle`}>{t("evidence.bundle", { status: textStatus(run.verification_status, t) })}</a>
           </li>
         ))}
       </ul>
@@ -535,18 +551,19 @@ function Evidence({ view }: { view: ProjectView }) {
 }
 
 function Lineage({ view, onSelect }: { view: ProjectView; onSelect: (id: string) => void }) {
+  const { t } = useDesk();
   const labels = new Map(view.lineage.nodes.map((node) => [node.id, node.label]));
   return (
     <>
-      <h2>Lineage</h2>
-      <p>Observed relationships come from an admitted snapshot or a finished check. A repair that is only proposed is marked as such.</p>
+      <h2>{t("lineage.title")}</h2>
+      <p>{t("lineage.lede")}</p>
       <table>
         <thead>
           <tr>
-            <th>From</th>
-            <th>Relation</th>
-            <th>To</th>
-            <th>Standing</th>
+            <th>{t("lineage.from")}</th>
+            <th>{t("lineage.relation")}</th>
+            <th>{t("lineage.to")}</th>
+            <th>{t("lineage.standing")}</th>
           </tr>
         </thead>
         <tbody>
@@ -563,7 +580,7 @@ function Lineage({ view, onSelect }: { view: ProjectView; onSelect: (id: string)
                   {labels.get(edge.target) ?? edge.target.slice(0, 8)}
                 </button>
               </td>
-              <td>{edge.observed ? "Observed" : "Proposed"}</td>
+              <td>{edge.observed ? t("lineage.observed") : t("lineage.proposed")}</td>
             </tr>
           ))}
         </tbody>
@@ -579,29 +596,36 @@ function Inspector({
   view: ProjectView;
   selection: Proposal | ProjectView["contracts"][number] | null;
 }) {
+  const { t } = useDesk();
   return (
-    <aside className="inspector" aria-label="Inspector">
-      <p className="k">Identity</p>
+    <aside className="inspector" aria-label={t("inspector.label")}>
+      <p className="k">{t("inspector.identity")}</p>
       <p>{view.project.name}</p>
       <p className="hash">{view.snapshot.content_hash}</p>
-      <p className="k">Selected</p>
+      <p className="k">{t("inspector.selected")}</p>
       {selection && "title" in selection && !("body" in selection) ? (
         <>
           <p>{selection.title}</p>
-          <p>{statusLabel(selection.classification)}</p>
+          <p>{textStatus(selection.classification, t)}</p>
           <p className="hash">{selection.patch_hash}</p>
         </>
       ) : null}
       {selection && "body" in selection ? (
         <>
           <p>{selection.body.title}</p>
-          <p>{statusLabel(selection.status)}</p>
+          <p>{textStatus(selection.status, t)}</p>
           <p className="hash">{selection.body_hash}</p>
         </>
       ) : null}
-      {!selection ? <p>Select a contract or a repair.</p> : null}
-      <p className="k">What this does not show</p>
-      <p>A matching number does not establish that the scientific conclusion is correct.</p>
+      {!selection ? <p>{t("inspector.empty")}</p> : null}
+      <p className="k">{t("inspector.limit")}</p>
+      <p>{t("inspector.limitBody")}</p>
     </aside>
   );
+}
+
+function textStatus(status: string, t: (key: string, vars?: Record<string, string>) => string) {
+  const key = `status.${status}`;
+  const value = t(key);
+  return value === key ? statusLabel(status) : value;
 }

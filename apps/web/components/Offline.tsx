@@ -1,10 +1,13 @@
+import { Copy, ViewTitle } from "@/components/Copy";
+
 export function Offline() {
   return (
     <main className="main" id="content">
-      <p className="eyebrow">Workstation</p>
-      <h1>The RETRACE service is not running.</h1>
-      <p>Start it from the project directory, then reload this page.</p>
-      <pre>.venv/bin/python -m retrace.api</pre>
+      <ViewTitle k="offline.title" />
+      <Copy as="p" className="eyebrow" k="offline.eyebrow" />
+      <Copy as="h1" k="offline.title" />
+      <Copy as="p" k="offline.body" />
+      <pre className="keep-ltr">.venv/bin/python -m retrace.api</pre>
     </main>
   );
 }

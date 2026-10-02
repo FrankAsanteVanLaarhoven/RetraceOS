@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import { DeskProvider } from "@/components/DeskProvider";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -8,16 +9,23 @@ export const metadata: Metadata = {
     "Local workstation for recovering a computational analysis, reviewing every change, and checking it against a researcher-approved contract.",
   applicationName: "RETRACE",
   robots: { index: false, follow: false },
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "16x16 32x32 48x48" },
+      { url: "/icon.svg", type: "image/svg+xml" },
+    ],
+    apple: [{ url: "/apple-icon.png", sizes: "180x180", type: "image/png" }],
+  },
 };
 
-const themeBoot = `(function(){try{var t=localStorage.getItem("retrace-theme")||"system";var d=localStorage.getItem("retrace-density")||"comfortable";var root=document.documentElement;root.dataset.density=d;root.dataset.themeChoice=t;var resolved=t==="system"?(window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"):t;root.dataset.theme=resolved;var dir=localStorage.getItem("retrace-dir");if(dir==="rtl"||dir==="ltr")root.dir=dir;}catch(e){}})();`;
+const themeBoot = `(function(){try{var t=localStorage.getItem("retrace-theme")||"system";var d=localStorage.getItem("retrace-density")||"comfortable";var root=document.documentElement;root.dataset.density=d;root.dataset.themeChoice=t;var resolved=t==="system"?(window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"):t;root.dataset.theme=resolved;var loc=localStorage.getItem("retrace-locale")||"en";root.lang=loc;var rtl={ar:1,he:1,fa:1,ur:1};var dir=localStorage.getItem("retrace-dir");if(dir!=="rtl"&&dir!=="ltr")dir=rtl[loc]?"rtl":"ltr";root.dir=dir;}catch(e){}})();`;
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" data-theme="light" data-density="comfortable" suppressHydrationWarning>
       <body>
         <script dangerouslySetInnerHTML={{ __html: themeBoot }} />
-        {children}
+        <DeskProvider>{children}</DeskProvider>
       </body>
     </html>
   );

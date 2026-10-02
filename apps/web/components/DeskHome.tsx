@@ -2,32 +2,19 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useDesk } from "@/components/DeskProvider";
 import { Notice } from "@/components/Status";
 import type { ApiError, ProjectBrief } from "@/lib/types";
 
 const CASES = [
-  {
-    slug: "ecology",
-    index: "01",
-    title: "Ecology measurements",
-    copy: "A path from another computer, a mean mass in grams, and a trap that drops a record.",
-  },
-  {
-    slug: "trajectory",
-    index: "02",
-    title: "Trajectory length",
-    copy: "A missing filename, a length that must stay in metres, and a trap that leaves centimetres in place.",
-  },
-  {
-    slug: "assay",
-    index: "03",
-    title: "Assay table",
-    copy: "A semicolon-separated table, a mean of every sample, and a trap that adds an exclusion.",
-  },
+  { slug: "ecology", index: "01", title: "case.ecology.title", copy: "case.ecology.copy" },
+  { slug: "trajectory", index: "02", title: "case.trajectory.title", copy: "case.trajectory.copy" },
+  { slug: "assay", index: "03", title: "case.assay.title", copy: "case.assay.copy" },
 ];
 
 export function DeskHome({ projects }: { projects: ProjectBrief[] }) {
   const router = useRouter();
+  const { t } = useDesk();
   const [pending, setPending] = useState<string | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
 
@@ -47,33 +34,33 @@ export function DeskHome({ projects }: { projects: ProjectBrief[] }) {
 
   return (
     <>
-      <p className="eyebrow">Workstation profile · demonstrations</p>
-      <h1>Recover the analysis without changing what it means.</h1>
-      <p className="lede">
-        RETRACE keeps the original notebook, asks you to approve a result contract, and will not call a changed analysis reproduced.
-        These three cases are labelled fixtures. The faults in them were injected.
+      <p className="eyebrow">{t("desk.eyebrow")}</p>
+      <h1>{t("desk.title")}</h1>
+      <p className="lede">{t("desk.lede")}</p>
+      <p>
+        <a className="text-link" href="/guide">{t("desk.guide")}</a>
       </p>
       {error?.message ? <Notice message={error.message} next={error.next} /> : null}
       <div className="cards">
         {CASES.map((item) => (
           <article className="card" key={item.slug}>
             <div className="index">DEMO {item.index}</div>
-            <h2>{item.title}</h2>
-            <p>{item.copy}</p>
+            <h2>{t(item.title)}</h2>
+            <p>{t(item.copy)}</p>
             <button className="primary" type="button" disabled={pending !== null} onClick={() => openCase(item.slug)}>
-              {pending === item.slug ? "Opening the case…" : "Open this case"}
+              {pending === item.slug ? t("desk.opening") : t("desk.open")}
             </button>
           </article>
         ))}
       </div>
       <section className="panel" style={{ marginTop: 24 }}>
-        <h2>Already on this desk</h2>
-        {projects.length === 0 ? <p>Open a demonstration, or import an evidence bundle from a colleague.</p> : null}
+        <h2>{t("desk.already")}</h2>
+        {projects.length === 0 ? <p>{t("desk.empty")}</p> : null}
         <ul>
           {projects.map((project) => (
             <li key={project.id}>
               <a href={`/projects/${project.id}`}>{project.name}</a>
-              {project.demo ? " · demonstration" : ""}
+              {project.demo ? ` · ${t("desk.demonstration")}` : ""}
             </li>
           ))}
         </ul>
@@ -85,6 +72,7 @@ export function DeskHome({ projects }: { projects: ProjectBrief[] }) {
 
 function ImportBundle() {
   const router = useRouter();
+  const { t } = useDesk();
   const [error, setError] = useState<ApiError | null>(null);
   const [pending, setPending] = useState(false);
 
@@ -107,10 +95,10 @@ function ImportBundle() {
         router.refresh();
       }}
     >
-      <label htmlFor="bundle">Import an evidence bundle</label>
+      <label htmlFor="bundle">{t("desk.importLabel")}</label>
       <input id="bundle" name="upload" type="file" accept=".zip,application/zip" required />
       <button className="ghost" type="submit" disabled={pending}>
-        {pending ? "Checking the bundle…" : "Import bundle"}
+        {pending ? t("desk.checking") : t("desk.import")}
       </button>
       {error?.message ? <Notice message={error.message} next={error.next} /> : null}
     </form>

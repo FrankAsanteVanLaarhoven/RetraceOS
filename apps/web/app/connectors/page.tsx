@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ConnectorsDesk } from "@/components/ConnectorsDesk";
 import { Offline } from "@/components/Offline";
 import { Shell } from "@/components/Shell";
 import { requireDesk } from "@/lib/guard";
@@ -13,18 +14,7 @@ export default async function ConnectorsPage() {
   const body = response?.ok ? ((await response.json()) as { connectors: Array<{ id: string; status: string; detail: string }> }) : { connectors: [] };
   return (
     <Shell name={desk.name} projects={desk.projects} current="/connectors">
-      <p className="eyebrow">Integrations</p>
-      <h1>Connectors</h1>
-      <p className="lede">Nothing here is connected. A missing credential stays visible. It is not shown as a successful link.</p>
-      <div className="cards">
-        {body.connectors.map((connector) => (
-          <article className="card" key={connector.id}>
-            <div className="index">{connector.id}</div>
-            <h2>{connector.status}</h2>
-            <p>{connector.detail}</p>
-          </article>
-        ))}
-      </div>
+      <ConnectorsDesk connectors={body.connectors} projects={desk.projects.map((project) => ({ id: project.id, name: project.name }))} />
     </Shell>
   );
 }

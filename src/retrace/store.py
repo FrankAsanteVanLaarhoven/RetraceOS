@@ -200,18 +200,39 @@ class Preference(Base):
     theme: Mapped[str] = mapped_column(String(20), default="system")
     density: Mapped[str] = mapped_column(String(20), default="comfortable")
     zone: Mapped[str] = mapped_column(String(80), default="UTC")
+    locale: Mapped[str] = mapped_column(String(20), default="en")
+
+
+class ConnectorSecret(Base):
+    """A token the person saved for their own account. API responses never include secret."""
+
+    __tablename__ = "connector_secrets"
+    principal_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    connector_id: Mapped[str] = mapped_column(String(40), primary_key=True)
+    secret: Mapped[str] = mapped_column(Text)
+    label: Mapped[str] = mapped_column(String(120), default="")
 
 
 class Store:
     def __init__(self, database: Path, objects: Path) -> None:
         objects.mkdir(parents=True, exist_ok=True)
+        self.database = database
         self.objects = objects
         self.engine = create_engine(
             f"sqlite:///{database}",
             connect_args={"check_same_thread": False},
         )
         Base.metadata.create_all(self.engine)
+        self._ensure_preference_locale()
         self._sessions = sessionmaker(self.engine, expire_on_commit=False)
+
+    def _ensure_preference_locale(self) -> None:
+        """create_all does not add columns to a database that already exists."""
+        with self.engine.begin() as connection:
+            rows = connection.exec_driver_sql("PRAGMA table_info(preferences)").fetchall()
+            names = {row[1] for row in rows}
+            if rows and "locale" not in names:
+                connection.exec_driver_sql("ALTER TABLE preferences ADD COLUMN locale VARCHAR(20) NOT NULL DEFAULT 'en'")
 
     def session(self) -> Session:
         return self._sessions()
@@ -230,3 +251,27 @@ class Store:
 
     def new_id(self) -> str:
         return secrets.token_hex(16)
+
+    def save_connector_secret(self, principal_id: str, connector_id: str, secret: str, label: str) -> None:
+        with self.session() as db:
+            row = db.get(ConnectorSecret, (principal_id, connector_id))
+            if row is None:
+                db.add(ConnectorSecret(principal_id=principal_id, connector_id=connector_id, secret=secret, label=label[:120]))
+            else:
+                row.secret = secret
+                row.label = label[:120]
+            db.commit()
+
+    def connector_secret(self, principal_id: str, connector_id: str) -> tuple[str, str] | None:
+        with self.session() as db:
+            row = db.get(ConnectorSecret, (principal_id, connector_id))
+            if row is None:
+                return None
+            return row.secret, row.label
+
+    def clear_connector_secret(self, principal_id: str, connector_id: str) -> None:
+        with self.session() as db:
+            row = db.get(ConnectorSecret, (principal_id, connector_id))
+            if row is not None:
+                db.delete(row)
+                db.commit()

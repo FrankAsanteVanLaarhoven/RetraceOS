@@ -21,6 +21,7 @@ from retrace.runner import execute_workspace
 from retrace.store import (
     Approval,
     CalendarEvent,
+    ConnectorSecret,
     ContractRow,
     Event,
     Layout,
@@ -43,6 +44,13 @@ from retrace.verifier import verify
 
 _NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 .'-]{0,39}$")
 _ALLOWED_UPLOAD = {".ipynb", ".csv", ".tsv", ".txt", ".md", ".json"}
+
+
+def _locale_tags() -> set[str]:
+    from importlib import resources
+
+    raw = resources.files("retrace").joinpath("locales.json").read_text(encoding="utf-8")
+    return {item["tag"] for item in json.loads(raw)}
 
 
 class Service:
@@ -80,7 +88,9 @@ class Service:
                 )
             )
             db.commit()
-            return {"id": principal.id, "tenant_id": principal.tenant_id, "display_name": principal.display_name}, token
+            person = {"id": principal.id, "tenant_id": principal.tenant_id, "display_name": principal.display_name}
+        self.ensure_mcp_client(person)
+        return person, token
 
     def principal_from_token(self, token: str | None) -> dict | None:
         if not token:
@@ -93,6 +103,72 @@ class Service:
             if principal is None:
                 return None
             return {"id": principal.id, "tenant_id": principal.tenant_id, "display_name": principal.display_name}
+
+    def ensure_mcp_client(self, principal: dict) -> None:
+        """Write a local tool file for this account. The desk does not return the key."""
+        directory = self.store.database.parent / "mcp"
+        path = directory / f"{principal['id']}.json"
+        existing = self.store.connector_secret(principal["id"], "mcp")
+        if existing is not None and path.is_file():
+            return
+        token = secrets.token_urlsafe(32)
+        self.store.save_connector_secret(principal["id"], "mcp", sha256_bytes(token.encode()), "local-tool")
+        payload = {
+            "server": "RETRACE",
+            "note": "Local tool connection for this desk account. It can read project names and questions. It cannot run a notebook.",
+            "url": "http://127.0.0.1:8765/mcp",
+            "authorization": f"Bearer {token}",
+        }
+        try:
+            directory.mkdir(parents=True, exist_ok=True)
+            temporary = path.with_suffix(".tmp")
+            temporary.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+            temporary.chmod(0o600)
+            temporary.replace(path)
+            path.chmod(0o600)
+        except OSError:
+            self.store.clear_connector_secret(principal["id"], "mcp")
+
+    def principal_from_mcp_key(self, token: str | None) -> dict | None:
+        if not token or any(char.isspace() for char in token) or len(token) > 200:
+            return None
+        digest = sha256_bytes(token.encode())
+        with self.store.session() as db:
+            row = db.scalar(
+                select(ConnectorSecret).where(ConnectorSecret.connector_id == "mcp", ConnectorSecret.secret == digest)
+            )
+            if row is None:
+                return None
+            principal = db.get(Principal, row.principal_id)
+            if principal is None:
+                return None
+            return {"id": principal.id, "tenant_id": principal.tenant_id, "display_name": principal.display_name}
+
+    def mcp_projects(self, principal: dict) -> list[dict[str, str]]:
+        return [
+            {"id": item["id"], "name": item["name"], "discipline": item["discipline"], "question": item["question"]}
+            for item in self.list_projects(principal)
+        ]
+
+    def mcp_project(self, principal: dict, project_id: str) -> dict[str, str | None]:
+        with self.store.session() as db:
+            project = self._project_row(db, principal["tenant_id"], project_id)
+            snapshot = self._snapshot_for_project(db, principal["tenant_id"], project_id)
+            runs = db.scalars(
+                select(Run).where(Run.project_id == project_id, Run.tenant_id == principal["tenant_id"]).order_by(Run.started_at)
+            ).all()
+            latest = runs[-1].verification_status if runs else None
+            admitted = snapshot.content_hash in allowlist()
+            return {
+                "id": project.id,
+                "name": project.name,
+                "discipline": project.discipline,
+                "question": project.question,
+                "notebook_path": snapshot.notebook_path,
+                "execution": "admitted-demonstration" if admitted else "inspection-only",
+                "latest_verification": latest,
+                "note": "This is a reading of the stored project. It is not a run, and it is not a reproduction result.",
+            }
 
     def sign_out(self, token: str | None) -> None:
         if not token:
@@ -108,12 +184,14 @@ class Service:
         with self.store.session() as db:
             row = db.get(Preference, principal["id"])
             if row is None:
-                return {"theme": "system", "density": "comfortable", "zone": "UTC"}
-            return {"theme": row.theme, "density": row.density, "zone": row.zone}
+                return {"theme": "system", "density": "comfortable", "zone": "UTC", "locale": "en"}
+            return {"theme": row.theme, "density": row.density, "zone": row.zone, "locale": row.locale or "en"}
 
-    def save_preferences(self, principal: dict, theme: str, density: str, zone: str) -> dict:
+    def save_preferences(self, principal: dict, theme: str, density: str, zone: str, locale: str | None = None) -> dict:
         if theme not in {"light", "dark", "system"} or density not in {"comfortable", "compact"}:
             raise RetraceError("bad_preference", "Theme or density is not one of the available choices.", "Choose light, dark, or system, and comfortable or compact density.")
+        if locale is not None and locale not in _locale_tags():
+            raise RetraceError("bad_locale", "That language is not in the catalogue.", "Choose a language from the list.")
         try:
             ZoneInfo(zone)
         except ZoneInfoNotFoundError as exc:
@@ -121,12 +199,14 @@ class Service:
         with self.store.session() as db:
             row = db.get(Preference, principal["id"])
             if row is None:
-                row = Preference(principal_id=principal["id"], theme=theme, density=density, zone=zone)
+                row = Preference(principal_id=principal["id"], theme=theme, density=density, zone=zone, locale=locale or "en")
                 db.add(row)
             else:
                 row.theme = theme
                 row.density = density
                 row.zone = zone
+                if locale is not None:
+                    row.locale = locale
             db.commit()
         return self.preferences(principal)
 
@@ -311,6 +391,35 @@ class Service:
             run.finished_at = utcnow()
             db.commit()
         return self.project_view(principal, project_id)
+
+    def share_notebook(self, principal: dict, project_id: str) -> dict[str, str]:
+        """Return the caller's notebook for export. Does not run it."""
+        with self.store.session() as db:
+            project = self._project_row(db, principal["tenant_id"], project_id)
+            snapshot = self._snapshot_for_project(db, principal["tenant_id"], project_id)
+            file_rows = db.scalars(
+                select(SnapshotFile).where(SnapshotFile.snapshot_id == snapshot.id, SnapshotFile.tenant_id == principal["tenant_id"])
+            ).all()
+            raw: bytes | None = None
+            for row in file_rows:
+                if row.path == snapshot.notebook_path:
+                    raw = self.store.read_bytes(row.sha256)
+                    break
+            if raw is None:
+                raise RetraceError("no_notebook", "This project has no notebook to export.", "Open a project that has a notebook.", status=409)
+            try:
+                notebook = raw.decode("utf-8")
+            except UnicodeDecodeError as exc:
+                raise RetraceError("bad_notebook", "The stored notebook is not readable text.", "Export the notebook again from its source.", status=409) from exc
+            if not notebook.strip():
+                raise RetraceError("no_notebook", "This project has no notebook to export.", "Open a project that has a notebook.", status=409)
+            return {
+                "project_id": project.id,
+                "title": project.name,
+                "question": project.question,
+                "notebook_path": snapshot.notebook_path,
+                "notebook": notebook,
+            }
 
     def export_bundle(self, principal: dict, project_id: str, run_id: str) -> bytes:
         view = self.project_view(principal, project_id)

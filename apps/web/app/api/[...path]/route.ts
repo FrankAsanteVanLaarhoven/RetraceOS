@@ -26,6 +26,9 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
     outgoing.set(key, value);
   });
   for (const setCookie of response.headers.getSetCookie()) outgoing.append("set-cookie", setCookie);
+  if (response.status === 204 || response.status === 205 || response.status === 304) {
+    return new Response(null, { status: response.status, headers: outgoing });
+  }
   return new Response(await response.arrayBuffer(), { status: response.status, headers: outgoing });
 }
 
