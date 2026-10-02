@@ -12,7 +12,7 @@ Date: 2026-10-02. Path: `/Users/favl/workspace/retrace`. No git commit.
 
 ## What was deliberately left out
 
-LangGraph, PostgreSQL, Redis, pgvector, a Claude repair agent, OpenRouter routing, OIDC, GitHub App installation, Slack, Google Calendar OAuth, Colab MCP, and translated copy for 35 locales. Each missing external service stays `NEEDS_CONFIGURATION` or is described as absent. None is simulated as healthy. A local tool connection can read the signed-in person's project names and questions. It cannot run a notebook, and the desk does not show its address.
+LangGraph, PostgreSQL, Redis, pgvector, a Claude repair agent, OIDC, GitHub App installation, Slack, Google Calendar OAuth, Colab MCP, and translated copy for 35 locales. Each missing external service stays `NEEDS_CONFIGURATION` or is described as absent. None is simulated as healthy. A local tool connection can read the signed-in person's project names and questions. It cannot run a notebook, and the desk does not show its address. Talk is a later route on the desk server. It calls OpenRouter for conversation, speech, and transcription when `OPENROUTER_API_KEY` is set. It is not a repair agent, and it does not receive notebooks.
 
 ## Production desk bundle
 

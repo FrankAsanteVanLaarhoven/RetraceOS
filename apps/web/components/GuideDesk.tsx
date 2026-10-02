@@ -44,7 +44,7 @@ export function GuideDesk() {
           <li>Only three practice notebooks can run. Any other notebook can be opened and read. It will not run, because no tested sandbox is set up.</li>
           <li>GitHub is working when this computer is signed in to a GitHub account. Export sends a project to a repository that account can write. It does not use the RETRACE application repository. Slack shares a project title only after you connect your own workspace. Google Calendar is not signed in; download the calendar file and import it into your own calendar. Colab stays unset, and notebooks are not sent there to run. Download a notebook and open it in your own Colab. Tools on this computer can read your project names and questions. They cannot run a notebook.</li>
           <li>The desk stores its own calendar. It does not talk to Google Calendar.</li>
-          <li>A model key on this machine is not called. Notebooks are not sent to a model provider.</li>
+          <li>Repairs are not sent to a model. Talk calls OpenRouter when the desk server has a key. It does not send notebooks or stored results, and it cannot approve a contract or assign a reproduction result. A missing key leaves Talk unconfigured.</li>
           <li>The database is a local file on this workstation. It is not an institutional database with row-level security.</li>
           <li>English is the reviewed language. Other languages change the buttons and headings. They are drafts, and the screen says so. Project names, notebook text, and stored results stay in the language they were written in.</li>
         </ul>
@@ -53,9 +53,10 @@ export function GuideDesk() {
       <section id="sign-in">
         <h2>Sign in</h2>
         <ol>
-          <li>Open this desk in the browser on this computer. The address is <span className="keep-ltr">http://127.0.0.1:3011</span>.</li>
-          <li>Type the name that should appear on reviews. Choose Continue.</li>
-          <li>There is no password. Anyone who can open that address on this machine can choose a name. Each name has its own projects. This is a local session, not a university or company login.</li>
+          <li>RETRACE is a public platform for scientists. On this computer the address is <span className="keep-ltr">http://127.0.0.1:3011</span>.</li>
+          <li>Type the name that should appear on your record. Choose Continue. Privacy and your record says what is stored.</li>
+          <li>There is no password in this build. Each name is a separate scientist account. The session cookie is named retrace_session. It is HttpOnly, lasts 12 hours, and is not an advertising cookie.</li>
+          <li>Settings can download your record or delete the account. Deletion removes the projects, the session, and any saved token from this service.</li>
         </ol>
       </section>
 

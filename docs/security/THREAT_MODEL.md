@@ -16,12 +16,13 @@ The blueprint threat labelled T10 is not in the files on this machine. Its sente
 ## Other boundaries that were implemented and tested
 
 - Accounts are display names. One name cannot read another's project (`test_accounts_cannot_read_each_other`). This is application filtering on SQLite. It is not PostgreSQL row-level security, and a database file copied off the machine is not protected by that filter.
-- Mutations require an allowed Origin. The session cookie is HttpOnly. The stored token is a SHA-256 hash.
+- Mutations require an allowed Origin. The session cookie is HttpOnly and SameSite=Lax. The stored token is a SHA-256 hash. Account responses use Cache-Control no-store. Sign-in is limited to 40 requests a minute per client address in the process, and other changes to 500. A scientist can download their record without session tokens or connector secrets, and can delete the account.
 - Pickle uploads are refused. Paths must be relative. Dotfiles are refused.
 - A changed patch after approval does not keep the old approval (`test_approval_dies_when_the_patch_changes`).
 - A finished run cannot be cancelled into a different state. A repeated idempotency key returns the same run.
 - A tampered evidence ZIP fails import.
 - The prompt bar cannot approve a run or name a panel outside the allowlist.
+- Talk sends the words of a turn, and a short recording when the scientist speaks, to OpenRouter only when the desk server has `OPENROUTER_API_KEY`. It does not send notebooks or stored results, and it does not store the conversation. It cannot approve a contract or assign a reproduction status. The microphone is allowed for this page only. Camera and location stay blocked.
 
 ## Boundaries that are not claimed
 

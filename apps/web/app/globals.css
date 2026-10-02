@@ -63,6 +63,7 @@ body {
   font-family: var(--font);
   font-size: 15px;
   line-height: 1.45;
+  padding-bottom: 72px;
 }
 :root[data-density="compact"] body { font-size: 14px; }
 a { color: inherit; }
@@ -485,6 +486,66 @@ th { color: var(--muted); font-weight: 600; font-size: 11px; letter-spacing: 0.0
 pre, code, .hash, .keep-ltr { direction: ltr; unicode-bidi: isolate; }
 :is(:lang(ar), :lang(he), :lang(fa), :lang(ur), :lang(hi), :lang(bn), :lang(ta), :lang(te), :lang(zh-Hans), :lang(ja), :lang(ko), :lang(th), :lang(el), :lang(ru), :lang(uk)) :is(h1, h2, .brand-name, .card h2) {
   font-family: var(--font);
+}
+
+.talk-launcher {
+  position: fixed;
+  z-index: 15;
+  inset-inline-end: 16px;
+  bottom: 16px;
+  min-width: 48px;
+  min-height: 48px;
+}
+.talk-panel {
+  position: fixed;
+  z-index: 15;
+  inset-inline: 16px;
+  bottom: 16px;
+  width: auto;
+  max-width: 420px;
+  margin-inline-start: auto;
+  max-height: calc(100dvh - 32px);
+  min-height: 0;
+  overflow: auto;
+  align-content: start;
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow), 0 16px 40px rgba(28, 25, 21, 0.12);
+}
+.talk-panel h2 { margin: 0; font-family: var(--display); font-size: 22px; }
+.talk-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.talk-panel .check { display: flex; align-items: center; gap: 8px; margin: 0; }
+.talk-panel p { margin: 0; }
+.talk-models, #talk-voice { color: var(--muted); font-size: 13px; }
+.talk-choices { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2); }
+.talk-choices .field { margin: 0; }
+.talk-log {
+  display: grid;
+  gap: var(--space-2);
+  max-height: 28dvh;
+  overflow: auto;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.talk-log li {
+  display: grid;
+  gap: 4px;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--paper-2);
+}
+.talk-log li span { color: var(--muted); font-size: 12px; font-weight: 600; }
+.talk-log li[data-role="user"] { background: var(--block-bg); }
+.talk-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.talk-panel textarea { resize: vertical; min-height: 72px; }
+@media (max-width: 420px) {
+  .talk-choices { grid-template-columns: 1fr; }
+  .talk-actions .primary, .talk-actions .ghost { flex: 1 1 100%; }
 }
 
 @media (prefers-reduced-motion: reduce) {

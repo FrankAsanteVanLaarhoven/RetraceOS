@@ -15,7 +15,7 @@ export default async function SettingsPage() {
   const capabilities = (await capabilitiesResponse.json()) as { profile: string; sandbox: string; database: string; models: Record<string, string> };
   return (
     <Shell name={desk.name} projects={desk.projects} current="/settings">
-      <SettingsDesk capabilities={capabilities} />
+      <SettingsDesk name={desk.name} capabilities={capabilities} />
     </Shell>
   );
 }

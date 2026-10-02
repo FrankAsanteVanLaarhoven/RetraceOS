@@ -43,6 +43,11 @@ export function LoginForm() {
         <p className="eyebrow">{t("login.eyebrow")}</p>
         <h1>{t("login.title")}</h1>
         <p className="lede">{t("login.lede")}</p>
+        <p>
+          <a className="text-link" href="/privacy">
+            {t("login.privacy")}
+          </a>
+        </p>
         <div className="field">
           <label htmlFor="display_name">{t("login.name")}</label>
           <input id="display_name" name="display_name" autoComplete="name" required maxLength={40} />

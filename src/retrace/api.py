@@ -26,16 +26,56 @@ from retrace.connectors import (
     slack_text,
 )
 from retrace.errors import RetraceError
+from retrace.privacy import privacy_notice
 from retrace.store import Store
 from retrace.uiplan import catalogue, parse_prompt, validate_plan
 from retrace.workflow import Service
 
-_ORIGINS = {
+_LOCAL_ORIGINS = {
     "http://127.0.0.1:3011",
     "http://localhost:3011",
     "http://testserver",
 }
 _HITS: dict[str, list[float]] = {}
+_SIGN_IN_LIMIT = 40
+_CHANGE_LIMIT = 500
+
+
+def allowed_origins() -> set[str]:
+    extra = {item.strip().rstrip("/") for item in os.environ.get("RETRACE_ORIGINS", "").split(",") if item.strip()}
+    return set(_LOCAL_ORIGINS) | extra
+
+
+def cookie_secure() -> bool:
+    return os.environ.get("RETRACE_COOKIE_SECURE", "").strip() == "1"
+
+
+def client_key(request: Request) -> str:
+    return request.client.host if request.client else "local"
+
+
+def take_limit(request: Request, bucket_name: str, maximum: int) -> JSONResponse | None:
+    now = time.monotonic()
+    key = f"{bucket_name}:{client_key(request)}"
+    bucket = [stamp for stamp in _HITS.get(key, []) if now - stamp < 60]
+    if len(bucket) >= maximum:
+        return JSONResponse(
+            {
+                "error": "rate_limited",
+                "message": "Too many requests from this machine.",
+                "next": "Wait a minute and try again.",
+            },
+            status_code=429,
+        )
+    bucket.append(now)
+    _HITS[key] = bucket
+    return None
+
+
+def apply_public_headers(response: Response) -> Response:
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Pragma"] = "no-cache"
+    return response
 
 
 def locales() -> list[dict]:
@@ -52,7 +92,7 @@ def capabilities() -> dict:
     return {
         "product": "RETRACE",
         "version": __version__,
-        "profile": "workstation-local",
+        "profile": "public-scientist",
         "release_decision": "REVISE",
         "sandbox": "Curated demonstration notebooks only. No tested sandbox is configured, so other notebooks are refused.",
         "database": "SQLite with application-enforced account separation. PostgreSQL row-level security is not claimed: no PostgreSQL server is configured.",
@@ -60,7 +100,7 @@ def capabilities() -> dict:
             "anthropic": model_state("ANTHROPIC_API_KEY"),
             "openrouter": model_state("OPENROUTER_API_KEY"),
             "repairs": "deterministic-diagnoser",
-            "note": "A configured key is not called. Notebooks and results are not sent to a model provider by this build.",
+            "note": "Repairs stay with the deterministic diagnoser. This API process does not call a model. The desk conversation calls OpenRouter only when OPENROUTER_API_KEY is set on the desk server. Notebooks and stored results are not included.",
         },
         "connectors": connector_rows(),
     }
@@ -73,11 +113,22 @@ def create_app(database: Path, objects: Path) -> FastAPI:
     app.state.engine = service.store.engine
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=sorted(_ORIGINS),
+        allow_origins=sorted(allowed_origins()),
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
         allow_headers=["Content-Type", "Origin"],
     )
+
+    @app.middleware("http")
+    async def platform_guard(request: Request, call_next):
+        if request.method not in {"GET", "HEAD", "OPTIONS"}:
+            bucket = "sign-in" if request.url.path == "/api/session" and request.method == "POST" else "change"
+            maximum = _SIGN_IN_LIMIT if bucket == "sign-in" else _CHANGE_LIMIT
+            blocked = take_limit(request, bucket, maximum)
+            if blocked is not None:
+                return apply_public_headers(blocked)
+        response = await call_next(request)
+        return apply_public_headers(response)
 
     @app.exception_handler(RetraceError)
     async def on_error(_request: Request, exc: RetraceError) -> JSONResponse:
@@ -88,8 +139,8 @@ def create_app(database: Path, objects: Path) -> FastAPI:
         if found is None:
             raise RetraceError(
                 "sign_in_required",
-                "Sign in on this workstation before opening a project.",
-                "Enter a display name. This is a local session, not institutional sign-in.",
+                "Sign in before opening a project.",
+                "Enter the name you use on this platform.",
                 status=401,
             )
         return found
@@ -98,30 +149,13 @@ def create_app(database: Path, objects: Path) -> FastAPI:
         if request.method == "GET":
             return
         origin = request.headers.get("origin")
-        if origin not in _ORIGINS:
+        if origin not in allowed_origins():
             raise RetraceError(
                 "origin_rejected",
-                "The request origin is not allowed to change workstation state.",
-                "Open RETRACE from the local desk.",
+                "The request origin is not allowed to change records on this service.",
+                "Open RETRACE from the address the operator published.",
                 status=403,
             )
-
-    def client_key(request: Request) -> str:
-        return request.client.host if request.client else "local"
-
-    def limit(request: Request) -> None:
-        now = time.monotonic()
-        key = client_key(request)
-        bucket = [stamp for stamp in _HITS.get(key, []) if now - stamp < 60]
-        if len(bucket) >= 120:
-            raise RetraceError(
-                "rate_limited",
-                "Too many sign-in attempts from this machine.",
-                "Wait a minute and try again.",
-                status=429,
-            )
-        bucket.append(now)
-        _HITS[key] = bucket
 
     def set_session(response: Response, token: str) -> None:
         response.set_cookie(
@@ -129,14 +163,21 @@ def create_app(database: Path, objects: Path) -> FastAPI:
             token,
             httponly=True,
             samesite="lax",
-            secure=False,
+            secure=cookie_secure(),
             path="/",
             max_age=60 * 60 * 12,
         )
 
+    def clear_session(response: Response) -> None:
+        response.delete_cookie("retrace_session", path="/", httponly=True, samesite="lax", secure=cookie_secure())
+
     @app.get("/api/health")
     def health() -> dict:
         return {"ok": True, "product": "RETRACE", "version": __version__}
+
+    @app.get("/api/privacy")
+    def privacy() -> dict:
+        return privacy_notice()
 
     @app.get("/api/capabilities")
     def caps() -> dict:
@@ -279,7 +320,6 @@ def create_app(database: Path, objects: Path) -> FastAPI:
     @app.post("/api/session")
     def sign_in(request: Request, payload: dict) -> JSONResponse:
         guard(request)
-        limit(request)
         person, token = service.sign_in(str(payload.get("display_name", "")))
         response = JSONResponse({"display_name": person["display_name"]})
         set_session(response, token)
@@ -295,7 +335,22 @@ def create_app(database: Path, objects: Path) -> FastAPI:
         guard(request)
         service.sign_out(request.cookies.get("retrace_session"))
         response = Response(status_code=204)
-        response.delete_cookie("retrace_session", path="/")
+        clear_session(response)
+        return response
+
+    @app.get("/api/account/export")
+    def export_account(request: Request) -> JSONResponse:
+        body = service.export_account(principal(request))
+        response = JSONResponse(body)
+        response.headers["Content-Disposition"] = 'attachment; filename="retrace-record.json"'
+        return response
+
+    @app.delete("/api/account")
+    def erase_account(request: Request) -> Response:
+        guard(request)
+        service.erase_account(principal(request))
+        response = Response(status_code=204)
+        clear_session(response)
         return response
 
     @app.get("/api/preferences")

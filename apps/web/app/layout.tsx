@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import { ConversationDock } from "@/components/ConversationDock";
 import { DeskProvider } from "@/components/DeskProvider";
 import "./globals.css";
 
 export const metadata: Metadata = {
   title: { default: "Desk", template: "%s · RETRACE" },
   description:
-    "Local workstation for recovering a computational analysis, reviewing every change, and checking it against a researcher-approved contract.",
+    "Public platform for scientists. Keep the original notebook, approve what a result must mean, and check a rerun against that approval.",
   applicationName: "RETRACE",
   robots: { index: false, follow: false },
   icons: {
@@ -25,7 +26,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="en" data-theme="light" data-density="comfortable" suppressHydrationWarning>
       <body>
         <script dangerouslySetInnerHTML={{ __html: themeBoot }} />
-        <DeskProvider>{children}</DeskProvider>
+        <DeskProvider>
+          {children}
+          <ConversationDock />
+        </DeskProvider>
       </body>
     </html>
   );

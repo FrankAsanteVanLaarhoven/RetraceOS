@@ -20,15 +20,16 @@ Use RETRACE when you want to recover an analysis and still be able to say what c
 - Only three practice notebooks can run. Any other notebook can be opened and read. It will not run, because no tested sandbox is set up.
 - GitHub is working when this computer is signed in to a GitHub account. Export sends a project to a repository that account can write. It does not use the RETRACE application repository. Slack shares a project title only after you connect your own workspace. Google Calendar is not signed in; download the calendar file and import it into your own calendar. Colab stays unset, and notebooks are not sent there to run. Download a notebook and open it in your own Colab. Tools on this computer can read your project names and questions. They cannot run a notebook.
 - The desk stores its own calendar. It does not talk to Google Calendar.
-- A model key on this machine is not called. Notebooks are not sent to a model provider.
+- Repairs are not sent to a model. Talk, on every page, calls OpenRouter when the desk server has OPENROUTER_API_KEY. The usual conversation uses Anthropic Claude Sonnet. Explaining a result uses Claude Opus. Drafting a record uses Claude Haiku. You can speak or type, and the reply can be spoken in a voice chosen by gender, tone, and country. The service does not store that conversation, and it does not send notebooks or stored results. Talk cannot approve a contract or assign a reproduction result. A missing key leaves Talk unconfigured.
 - The database is a local file on this workstation. It is not an institutional database with row-level security.
 - English is the reviewed language. Other languages change the buttons and headings. They are drafts, and the screen says so. Project names, notebook text, and stored results stay in the language they were written in.
 
 ## Sign in
 
-1. Open this desk in the browser on this computer. The address is `http://127.0.0.1:3011`.
-2. Type the name that should appear on reviews. Choose Continue.
-3. There is no password. Anyone who can open that address on this machine can choose a name. Each name has its own projects. This is a local session, not a university or company login.
+1. RETRACE is a public platform for scientists. On this computer the address is `http://127.0.0.1:3011`.
+2. Type the name that should appear on your record. Choose Continue. Privacy and your record says what is stored.
+3. There is no password in this build. Each name is a separate scientist account. The session cookie is named `retrace_session`. It is HttpOnly, lasts 12 hours, and is not an advertising cookie.
+4. Settings can download your record or delete the account. Deletion removes the projects, the session, and any saved token from this service.
 
 ## Find your way around
 

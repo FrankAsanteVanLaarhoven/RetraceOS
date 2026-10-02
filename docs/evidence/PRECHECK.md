@@ -27,7 +27,7 @@ Code written in this tree is Apache-2.0 and credited to Frank Asante Van Laarhov
 
 ## 5. Data classification and egress
 
-Demonstration notebooks and their small CSV tables are labelled fixtures. Session data lives in `data/` on this workstation and is gitignored. The running API process can see an Anthropic key in its environment. Capabilities report that key as `CONFIGURED_NOT_USED`. This build does not call Anthropic or OpenRouter and does not send notebooks or results to a model provider. No remote push, deploy, or external message was sent.
+Demonstration notebooks and their small CSV tables are labelled fixtures. Session data lives in `data/` on this workstation and is gitignored. The running API process can see an Anthropic key in its environment. Capabilities report that key as `CONFIGURED_NOT_USED`. This build does not call Anthropic or OpenRouter and does not send notebooks or results to a model provider. No remote push, deploy, or external message was sent. A later desk route, Talk, calls OpenRouter for a conversation when `OPENROUTER_API_KEY` is set on the Next.js server. Repairs still do not call a model, and notebooks are still not sent.
 
 ## 6. Authorised actions and budget
 

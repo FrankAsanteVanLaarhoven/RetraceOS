@@ -708,3 +708,56 @@ def test_existing_preferences_gain_locale(tmp_path: Path) -> None:
         names = {row[1] for row in connection.exec_driver_sql("PRAGMA table_info(preferences)")}
         assert "locale" in names
         assert connection.exec_driver_sql("SELECT locale FROM preferences").scalar() == "en"
+
+
+def test_public_platform_keeps_each_scientist_record(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    import retrace.api as api
+
+    notice = client.get("/api/privacy")
+    assert notice.status_code == 200
+    assert notice.headers["cache-control"] == "no-store"
+    body = notice.json()
+    assert body["audience"].startswith("RETRACE is a public platform for scientists")
+    assert body["cookie"]["name"] == "retrace_session"
+    assert "not part of this build" in body["assessment"]
+    notice_limits = " ".join(body["not_done"])
+    assert "Notebook files and stored results are not sent" in notice_limits
+    assert "OpenRouter" in notice_limits
+
+    sign_in(client, "Grace Hopper")
+    grace = open_demo(client, "ecology")
+    grace_name = grace["project"]["name"]
+    sign_in(client, "Ada Lovelace")
+    ada = open_demo(client, "assay")
+    person = client.app.state.service.principal_from_token(client.cookies.get("retrace_session"))
+    client.app.state.service.store.save_connector_secret(person["id"], "slack", "xoxb-test-token", "workspace")
+    exported = client.get("/api/account/export")
+    assert exported.status_code == 200
+    assert "retrace-record.json" in exported.headers["content-disposition"]
+    record = exported.json()
+    assert record["account"] == "Ada Lovelace"
+    assert any(project["name"] == "Assay table" for project in record["projects"])
+    assert grace_name not in exported.text
+    assert "xoxb-test-token" not in exported.text
+    assert "Bearer" not in exported.text
+    signed = client.post("/api/session", json={"display_name": "Ada Lovelace"}, headers=ORIGIN)
+    cookie = signed.headers["set-cookie"].lower()
+    assert "httponly" in cookie
+    assert "samesite=lax" in cookie
+    assert "secure" not in cookie
+    removed = client.delete("/api/account", headers=ORIGIN)
+    assert removed.status_code == 204
+    assert client.get(f"/api/projects/{ada['project']['id']}").status_code == 401
+    sign_in(client, "Grace Hopper")
+    still = client.get(f"/api/projects/{grace['project']['id']}")
+    assert still.status_code == 200
+    assert still.json()["project"]["name"] == grace_name
+
+    api._HITS.clear()
+    monkeypatch.setattr(api, "_SIGN_IN_LIMIT", 2)
+    assert client.post("/api/session", json={"display_name": "Rate One"}, headers=ORIGIN).status_code == 200
+    assert client.post("/api/session", json={"display_name": "Rate Two"}, headers=ORIGIN).status_code == 200
+    blocked = client.post("/api/session", json={"display_name": "Rate Three"}, headers=ORIGIN)
+    assert blocked.status_code == 429
+    assert blocked.json()["error"] == "rate_limited"
+    assert "Wait a minute" in blocked.json()["next"]

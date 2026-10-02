@@ -180,6 +180,88 @@ class Service:
                 db.delete(row)
                 db.commit()
 
+    def export_account(self, principal: dict) -> dict:
+        """Return this scientist's record. Session tokens and connector secrets stay out."""
+        with self.store.session() as db:
+            projects = db.scalars(select(Project).where(Project.tenant_id == principal["tenant_id"])).all()
+            project_rows = [
+                {
+                    "id": project.id,
+                    "name": project.name,
+                    "discipline": project.discipline,
+                    "question": project.question,
+                }
+                for project in projects
+            ]
+            calendar = [
+                {"title": event.title, "start_utc": event.start_utc, "zone": event.zone}
+                for event in db.scalars(select(CalendarEvent).where(CalendarEvent.tenant_id == principal["tenant_id"])).all()
+            ]
+            records = [
+                {"project_id": page.project_id, "status": page.status}
+                for page in db.scalars(select(WikiPage).where(WikiPage.tenant_id == principal["tenant_id"])).all()
+            ]
+        return {
+            "product": "RETRACE",
+            "account": principal["display_name"],
+            "preferences": self.preferences(principal),
+            "projects": project_rows,
+            "calendar": calendar,
+            "records": records,
+            "omitted": "Session tokens and connector secrets are not included.",
+        }
+
+    def erase_account(self, principal: dict) -> None:
+        """Remove this scientist's rows, tool file, and object files that no other account still uses."""
+        tenant_id = principal["tenant_id"]
+        principal_id = principal["id"]
+        with self.store.session() as db:
+            digests = {
+                digest
+                for digest in db.scalars(select(SnapshotFile.sha256).where(SnapshotFile.tenant_id == tenant_id)).all()
+                if len(digest) == 64 and all(character in "0123456789abcdef" for character in digest)
+            }
+            tenant_models = (
+                WikiPage,
+                Layout,
+                CalendarEvent,
+                Event,
+                Approval,
+                Run,
+                Proposal,
+                ContractRow,
+                SnapshotFile,
+                Snapshot,
+                Project,
+            )
+            for model in tenant_models:
+                for row in db.scalars(select(model).where(model.tenant_id == tenant_id)).all():
+                    db.delete(row)
+            for row in db.scalars(select(SessionRow).where(SessionRow.principal_id == principal_id)).all():
+                db.delete(row)
+            preference = db.get(Preference, principal_id)
+            if preference is not None:
+                db.delete(preference)
+            for row in db.scalars(select(ConnectorSecret).where(ConnectorSecret.principal_id == principal_id)).all():
+                db.delete(row)
+            person = db.get(Principal, principal_id)
+            if person is not None:
+                db.delete(person)
+            tenant = db.get(Tenant, tenant_id)
+            if tenant is not None:
+                db.delete(tenant)
+            db.commit()
+        if digests:
+            with self.store.session() as db:
+                still = set(db.scalars(select(SnapshotFile.sha256).where(SnapshotFile.sha256.in_(digests))).all())
+            for digest in digests - still:
+                path = self.store.objects / digest
+                if path.is_file():
+                    path.unlink()
+        client_file = self.store.database.parent / "mcp" / f"{principal_id}.json"
+        if client_file.is_file():
+            client_file.unlink()
+
     def preferences(self, principal: dict) -> dict:
         with self.store.session() as db:
             row = db.get(Preference, principal["id"])

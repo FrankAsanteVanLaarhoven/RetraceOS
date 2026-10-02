@@ -158,3 +158,42 @@ How to use starts closed. Choosing it opens the fifteen section lines. Choosing 
 | Q20 Controls | PASS | The closed list did not show Start here. Enter opened it. Open a practice case opened `#case` and was marked current. The last line was If something goes wrong. Reload kept the section open. |
 | Q09 Loading | BLOCKED | Not exercised with a slowed response. |
 | Q17 JavaScript | BLOCKED | Not remeasured. |
+
+## Follow-up: public platform for scientists
+
+Date: 2026-10-02. Dev server `http://127.0.0.1:3011`, API `http://127.0.0.1:8765`. Chrome via playwright-core. A temporary display name was created for the export and deletion check, then removed. The existing local account and its three projects were still present afterward. This does not replace the tables above and does not call the gate a release pass. Decision remains **REVISE**.
+
+The product is a public platform for scientists. This checkout still serves the local address. No public domain was configured. `RETRACE_COOKIE_SECURE` was not set, so the session cookie is not marked Secure on this HTTP address.
+
+| ID | Result | Evidence |
+|---|---|---|
+| Q01 Production domain | N/A | No approved public origin. The local address stayed `http://127.0.0.1:3011`. |
+| Q02 Page titles | PASS | The privacy view title was `Privacy · RETRACE`. |
+| Q03 Meta description | PASS | The shared description names the public scientific platform and does not include a scientist's record. |
+| Q10 Errors | PASS for this flow | Delete stayed disabled until the typed name matched the signed-in account. A wrong name left it disabled. |
+| Q11 Headings | PASS | The privacy page has one `h1`, Privacy and your record. Session cookie, stored data, and rights are `h2` sections. |
+| Q12 Names | PASS | Download my record, the delete field, and Delete this account have visible names. |
+| Q14 Console | PASS | The privacy walk recorded no app-owned console errors. |
+| Q18 Mobile layout | PASS | At 390×844, document overflow was 0 on the privacy page and on Settings. Screenshots: `docs/quality/privacy-mobile.png`, `docs/quality/privacy-settings-mobile.png`. |
+| Q19 Spacing | PASS | The page uses the guide measure, the existing type, and the existing buttons. Screenshot: `docs/quality/privacy-desktop.png`. |
+| Q20 Controls | PASS | Sign in on the privacy page opened the sign-in form. Download my record returned a file for that account with no bearer token. Delete this account returned to Sign in. Response headers included `X-Frame-Options: DENY`, `nosniff`, and a strict referrer policy. |
+| Q09 Loading | BLOCKED | Not exercised with a slowed response. |
+| Q17 JavaScript | BLOCKED | Not remeasured. |
+
+## Follow-up: conversation assistant
+
+Date: 2026-10-02. Dev server `http://127.0.0.1:3011`, API `http://127.0.0.1:8765`. Chrome via playwright-core. `OPENROUTER_API_KEY` was not set on this machine, so no model was called and no reply was invented. A temporary display name was signed in for the guide and settings check, then deleted. The existing local account preferences were unchanged. This does not replace the tables above and does not call the gate a release pass. Decision remains **REVISE**.
+
+| ID | Result | Evidence |
+|---|---|---|
+| Q01 Production domain | N/A | No approved public origin. The desk server reads `OPENROUTER_API_KEY`. It was absent here and was not written into the page. |
+| Q02 Page titles | PASS | The sign-in title stayed `Sign in · RETRACE`. The privacy title stayed `Privacy · RETRACE`. Talk is a panel, not a separate document. |
+| Q10 Errors | PASS for this flow | With no key, Send and Live talk stayed disabled. The panel said the OpenRouter key is not set and named the Vercel environment variable. `POST /api/assistant`, `/api/assistant/speech`, and `/api/assistant/hear` returned 503 `needs_configuration`. |
+| Q11 Headings | PASS | The sign-in `h1` stayed Sign in. The panel heading is Conversation. |
+| Q12 Names | PASS | Job, country, gender, tone, the message field, Speak the reply, Send, Live talk, Stop, and Close have visible names. |
+| Q14 Console | PASS | The walk recorded no app-owned console errors. |
+| Q18 Mobile layout | PASS | Document overflow was 0 at 1440×900, 768×1024, and 390×844 with the panel open, and at 390 on privacy and settings. Screenshots: `docs/quality/talk-desktop.png`, `docs/quality/talk-mobile.png`, `docs/quality/talk-settings-mobile.png`. |
+| Q19 Spacing | PASS | The panel uses the existing paper, ink, radius, and buttons. |
+| Q20 Controls | PASS | Talk opened the panel. Escape closed it and Enter on Talk opened it again. Country, gender, and tone changed the named voice. A feminine United States choice named Paul as the closest voice. Jane was the United Kingdom feminine voice at a bright tone, with the style curious. A masculine France choice named Marie as the closest voice. The guide states the Talk limit. Settings showed that the assistant needs the server key. Delete this account returned to Sign in. |
+| Q09 Loading | BLOCKED | The missing-key state is immediate. A slowed model reply was not exercised because the key is not set. |
+| Q17 JavaScript | BLOCKED | Not remeasured. |
