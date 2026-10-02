@@ -1,0 +1,142 @@
+{
+  "loginFocus": "display_name",
+  "loginButton": "Continue",
+  "home": {
+    "overflow": 0,
+    "h1": "Recover the analysis without changing what it means."
+  },
+  "afterArrow": {
+    "active": "tab-contract",
+    "selected": "Contract"
+  },
+  "afterEnd": "Lineage",
+  "mobileProject": {
+    "overflow": 0,
+    "title": "Ecology measurements · RETRACE",
+    "tabs": [
+      {
+        "text": "Snapshot",
+        "x": 16,
+        "y": 611,
+        "w": 91,
+        "h": 36,
+        "textClipped": false,
+        "outside": false
+      },
+      {
+        "text": "Contract",
+        "x": 111,
+        "y": 611,
+        "w": 86,
+        "h": 36,
+        "textClipped": false,
+        "outside": false
+      },
+      {
+        "text": "Review",
+        "x": 201,
+        "y": 611,
+        "w": 75,
+        "h": 36,
+        "textClipped": false,
+        "outside": false
+      },
+      {
+        "text": "Run",
+        "x": 279,
+        "y": 611,
+        "w": 53,
+        "h": 36,
+        "textClipped": false,
+        "outside": false
+      },
+      {
+        "text": "Evidence",
+        "x": 16,
+        "y": 651,
+        "w": 88,
+        "h": 36,
+        "textClipped": false,
+        "outside": false
+      },
+      {
+        "text": "Lineage",
+        "x": 108,
+        "y": 651,
+        "w": 80,
+        "h": 36,
+        "textClipped": false,
+        "outside": false
+      }
+    ]
+  },
+  "tabletProject": {
+    "overflow": 0,
+    "title": "Ecology measurements · RETRACE",
+    "tabs": [
+      {
+        "text": "Snapshot",
+        "x": 16,
+        "y": 495,
+        "w": 91,
+        "h": 36,
+        "textClipped": false,
+        "outside": false
+      },
+      {
+        "text": "Contract",
+        "x": 111,
+        "y": 495,
+        "w": 86,
+        "h": 36,
+        "textClipped": false,
+        "outside": false
+      },
+      {
+        "text": "Review",
+        "x": 201,
+        "y": 495,
+        "w": 75,
+        "h": 36,
+        "textClipped": false,
+        "outside": false
+      },
+      {
+        "text": "Run",
+        "x": 279,
+        "y": 495,
+        "w": 53,
+        "h": 36,
+        "textClipped": false,
+        "outside": false
+      },
+      {
+        "text": "Evidence",
+        "x": 336,
+        "y": 495,
+        "w": 88,
+        "h": 36,
+        "textClipped": false,
+        "outside": false
+      },
+      {
+        "text": "Lineage",
+        "x": 428,
+        "y": 495,
+        "w": 80,
+        "h": 36,
+        "textClipped": false,
+        "outside": false
+      }
+    ]
+  },
+  "urdu": {
+    "dir": "rtl",
+    "banner": "This locale is catalogued and has not had linguistic review. The interface stays in English. The writing direction follows the catalogue, including Urdu as right to left."
+  },
+  "missingStatus": 404,
+  "missingHeading": "That page is not on this desk.",
+  "connectorHasNeedsConfiguration": true,
+  "connectedClaim": false,
+  "failures": []
+}

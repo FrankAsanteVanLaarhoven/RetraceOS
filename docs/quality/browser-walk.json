@@ -1,0 +1,52 @@
+{
+  "consoleErrors": [
+    "Failed to load resource: the server responded with a status of 404 (Not Found)"
+  ],
+  "report": [
+    {
+      "name": "login title",
+      "ok": true,
+      "detail": "Sign in · RETRACE"
+    },
+    {
+      "name": "desk heading",
+      "ok": true,
+      "detail": "signed in and reached the desk"
+    },
+    {
+      "name": "opened ecology",
+      "ok": true,
+      "detail": "Desk"
+    },
+    {
+      "name": "reproduced",
+      "ok": true,
+      "detail": "safe path repair"
+    },
+    {
+      "name": "changed result",
+      "ok": true,
+      "detail": "This patch changes the analysis. RETRACE has not accepted it as a reproduction, even where a number still matches."
+    },
+    {
+      "name": "connectors honest",
+      "ok": true,
+      "detail": "status text checked"
+    },
+    {
+      "name": "custom 404",
+      "ok": true,
+      "detail": "status 404"
+    },
+    {
+      "name": "mobile overflow",
+      "ok": false,
+      "detail": "scroll overflow 85px"
+    },
+    {
+      "name": "urdu catalogue",
+      "ok": true,
+      "detail": "This locale is catalogued and has not had linguistic review. The interface stays in English. The writing direction follows the catalogue, including Urdu as right to left."
+    }
+  ]
+}

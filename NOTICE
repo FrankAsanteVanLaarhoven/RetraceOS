@@ -1,0 +1,10 @@
+RETRACE
+Copyright 2026 Frank Asante Van Laarhoven
+
+Licensed under the Apache License, Version 2.0.
+The license text is the LICENSE file.
+
+Third-party packages are fetched at install time. A licence clearance of those
+packages has not been completed. The clean-environment inventory is
+docs/evidence/environment-python-clean.txt and the web lockfile is
+apps/web/pnpm-lock.yaml. Those inventories are not a signed release SBOM.
