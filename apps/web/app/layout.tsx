@@ -26,6 +26,12 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="en" data-theme="light" data-density="comfortable" suppressHydrationWarning>
       <body>
         <script dangerouslySetInnerHTML={{ __html: themeBoot }} />
+        <div className="scene" aria-hidden="true">
+          <div className="scene-world">
+            <div className="scene-west" />
+            <div className="scene-east" />
+          </div>
+        </div>
         <DeskProvider>
           {children}
           <ConversationDock />

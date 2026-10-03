@@ -216,3 +216,19 @@ The desk and the API deploy as one Vercel project, `retrace-os`, using services 
 | Q20 Controls | PASS for this probe | Sign-in on the preview set `retrace_session` as HttpOnly, SameSite=lax, and Secure. Delete account returned 204. Talk stayed on the desk. `/api/health` returned the RETRACE version. Capabilities said records last only until the instance stops, and row-level security is not claimed. |
 | Q09 Loading | BLOCKED | A slowed response was not exercised. |
 | Q17 JavaScript | BLOCKED | The check build's static JavaScript totalled 1,313,538 bytes. That was not compared with a recorded budget. |
+
+## Follow-up: infrastructure backdrop
+
+Date: 2026-10-03. Local dev desk `http://127.0.0.1:3011`. Chrome via playwright-core. This does not replace the tables above and does not call the gate a release pass. Decision remains **REVISE**. The connected Vercel project builds this commit after it is pushed. Until that build is ready, the vercel.app host does not show the drawings.
+
+| ID | Result | Evidence |
+|---|---|---|
+| Q11 Headings | PASS for this change | One `h1` on sign-in, the desk, connectors, the ecology project, the guide, settings, privacy, and the 404. |
+| Q12 Alternative text | PASS for this change | The scene is `aria-hidden` and `pointer-events: none`. The drawings are CSS backgrounds, so they are not announced. |
+| Q14 Console | PASS for the exercised routes | No app-owned console errors on sign-in, the desk, the guide, connectors, the ecology project, settings, privacy, or the 404. |
+| Q18 Mobile layout | PASS for this change | Document overflow was 0 at 1440×900, 768×1024, and 390×844. Sign-in shots: `docs/quality/backdrop-login-desktop.png`, `docs/quality/backdrop-login-phone.png`. The 404 shot is `docs/quality/backdrop-missing-desktop.png`. |
+| Q19 Spacing | PASS for this change | Paper, ink, radius, and the 4/8/12/16/24px steps are unchanged. The title card uses `36rem` so the eyebrow, heading, and lede share one width. `ch` was not used, because it follows each element's font size. |
+| Q20 Controls | PASS for this change | The name field took focus. Tab reached Continue. Enter on Hide closed the rail. Open this case opened the ecology project. Delete account returned to sign-in. `GET /not-a-real-route` returned 404. |
+| Q08 Custom 404 | PASS for this change | Status 404. Heading "That page is not on this desk." The scene stays behind the recovery card. |
+| Q09 Loading | BLOCKED | A slowed response was not exercised. |
+| Q17 JavaScript | BLOCKED | No new script. The bundle was not remeasured. |
