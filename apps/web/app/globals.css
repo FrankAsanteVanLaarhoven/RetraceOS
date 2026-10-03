@@ -88,12 +88,12 @@ body {
   background-size: cover;
 }
 .scene-west {
-  background-image: url("/backdrop-west.png");
+  background-image: url("/backdrop-west.svg");
   background-position: center;
 }
 .scene-east {
-  background-image: url("/backdrop-east.png");
-  background-position: left center;
+  background-image: url("/backdrop-east.svg");
+  background-position: center;
 }
 .scene::after {
   content: "";

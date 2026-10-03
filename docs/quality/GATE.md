@@ -232,3 +232,16 @@ Date: 2026-10-03. Local dev desk `http://127.0.0.1:3011`. Chrome via playwright-
 | Q08 Custom 404 | PASS for this change | Status 404. Heading "That page is not on this desk." The scene stays behind the recovery card. |
 | Q09 Loading | BLOCKED | A slowed response was not exercised. |
 | Q17 JavaScript | BLOCKED | No new script. The bundle was not remeasured. |
+
+## Follow-up: backdrop labels
+
+Date: 2026-10-03. Local dev desk `http://127.0.0.1:3011`. Chrome via playwright-core. This does not replace the tables above and does not call the gate a release pass. Decision remains **REVISE**.
+
+The wireframe labels now use the desk’s own words: original notebook, untouched snapshot, result contract, approval, rerun, checks, evidence, lineage, repair, reanalysis, scientist record, and changed result. The scene stays decorative and is not announced.
+
+| ID | Result | Evidence |
+|---|---|---|
+| Q12 Alternative text | PASS for this change | The scene remains `aria-hidden`. The drawings are CSS backgrounds. |
+| Q18 Mobile layout | PASS for sign-in | Document overflow was 0 at 1440×900 and 390×844. Shots: `docs/quality/backdrop-labels-desktop.png`, `docs/quality/backdrop-labels-phone.png`. |
+| Q09 Loading | BLOCKED | A slowed response was not exercised. |
+| Q17 JavaScript | BLOCKED | No new script. The bundle was not remeasured. |
